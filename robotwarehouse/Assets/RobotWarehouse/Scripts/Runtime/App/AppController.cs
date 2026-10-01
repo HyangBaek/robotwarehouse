@@ -29,12 +29,36 @@ namespace RobotWarehouse.App
         enum VoiceTarget { Describe, Answer }
 
         [Header("배치")]
-        [Tooltip("미니어처 창고를 놓을 위치 (XR Origin 기준이 아니라 월드 좌표)")]
+        [Tooltip("미니어처 창고를 올릴 테이블. 지정하면 창고는 이 테이블 윗면에, 패널은 테이블 양옆에 놓인다")]
+        public GameObject table;
+        [Tooltip("테이블 윗면 중 창고가 차지할 비율")]
+        [Range(0.5f, 1f)] public float tableMargin = 0.92f;
+        [Tooltip("패널 높이 (바닥 기준, m)")]
+        public float panelHeight = 1.35f;
+
+        [Header("사용자 위치")]
+        [Tooltip("헤드셋 추적이 잡히면 XR Origin을 옮겨, 사용자가 테이블 앞에서 테이블을 정면으로 보게 맞춘다 (씬의 XR Origin 위치·방향에 의존하지 않음)")]
+        public bool alignUserToTable = true;
+        [Tooltip("테이블 중심에서 사용자까지 거리(m)")]
+        public float standDistance = 1.6f;
+
+        [Header("실물 1:1 (관제 보기)")]
+        [Tooltip("실물 창고 바닥을 사용자 바닥보다 몇 m 아래에 둘지. 무인 창고를 위에서 내려다보는 관제 시점")]
+        public float lifeSizeDepth = 2f;
+        [Tooltip("랙이 사용자 바닥 위로 튀어나오지 않게 깊이를 자동으로 늘림 (가장 높은 구조물 + 0.3m 이상)")]
+        public bool autoDepth = true;
+        [Tooltip("실물 보기에서 숨길 씬 오브젝트(바닥·벽 등). 비우면 이름이 Floor인 오브젝트를 숨긴다. 충돌체는 그대로 둬서 떨어지지 않음")]
+        public GameObject[] hideInLifeSize;
+        [Tooltip("사용자 발밑 유리 바닥의 불투명도 (0이면 안 보임)")]
+        [Range(0f, 0.5f)] public float glassFloorAlpha = 0.1f;
+        [Tooltip("실물 보기에서 창고 둘레 벽을 반투명하게")]
+        public bool translucentWallsInLifeSize = true;
+
+        [Header("테이블이 없을 때")]
+        [Tooltip("미니어처 창고를 놓을 위치 (월드 좌표)")]
         public Vector3 tableCenter = new Vector3(0f, 0.8f, 1.1f);
         [Tooltip("미니어처 모드에서 창고 긴 변 길이(m)")]
         public float miniatureSize = 1.4f;
-        [Tooltip("미니어처 모드에서만 보이는 테이블 (선택)")]
-        public GameObject table;
         public Vector3 leftPanelOffset = new Vector3(-1.05f, 1.35f, 0.9f);
         public Vector3 rightPanelOffset = new Vector3(1.05f, 1.35f, 0.9f);
 
@@ -47,6 +71,7 @@ namespace RobotWarehouse.App
         PathLineView _pathView;
         HeatmapLayer _heatmap;
         RackGrabEditor _rackEditor;
+        InventoryView _inventory;
         VoiceRecorder _recorder;
         AudioSource _audio;
         MainPanels _ui;
@@ -63,7 +88,12 @@ namespace RobotWarehouse.App
         bool _updatingSlider;
         int _fetchGeneration;
         bool _framesComplete;
-        bool _prevA;
+        bool _prevA, _prevB;
+        Vector3? _approachDir;
+        bool _aligned;
+        float? _groundY;
+        bool _realignRequested;
+        Action _unsubscribeRecenter;
         bool? _lastXrActive;
         VoiceTarget _voiceTarget;
         Action _retryAction;
@@ -79,18 +109,72 @@ namespace RobotWarehouse.App
             EnsureEventSystem();
             BuildWorld();
             BuildUI();
+            StartCoroutine(AlignWhenTracked());
+            _unsubscribeRecenter = UserAligner.SubscribeRecenter(() => _realignRequested = true);
             _ws.ReconnectInterval = AppConfig.ReconnectIntervalSec;
             _ws.OnMessage += HandleWsMessage;
             _ws.OnStateChanged += HandleWsState;
             SetPhase(Phase.Idle);
-            _ui.Log("서버 IP를 입력하고 연결하세요. 서버 없이 보려면 '오프라인 재생'.");
+            if (AppConfig.AutoConnect)
+            {
+                Connect();
+            }
+            else
+            {
+                _ui.Log("'다시 연결'을 누르면 서버에 연결합니다. 서버 없이 보려면 '오프라인 재생'.");
+            }
         }
 
-        void OnDestroy() => _ws.Dispose();
+        void OnDestroy()
+        {
+            _ws.Dispose();
+            _unsubscribeRecenter?.Invoke();
+        }
+
+        /// <summary>헤드셋 추적이 잡힐 때까지(최대 3초) 기다렸다가 사용자를 테이블 앞으로 맞춘다.</summary>
+        IEnumerator AlignWhenTracked()
+        {
+            var origin = UserAligner.FindOrigin();
+            UserAligner.EnsureGround(origin);
+            if (origin != null) _groundY = origin.transform.position.y;
+            // 헤드셋을 쓰기 전에는 맞추지 않는다 (Update에서 추적이 잡히는 순간 맞춤)
+            yield return null;
+            if (UserAligner.HeadReady(origin)) RealignToTable();
+            else PlacePanels();
+        }
+
+        /// <summary>
+        /// 사용자를 테이블 앞(standDistance)으로 옮기고 테이블을 보게 한 뒤, 패널·창고를 다시 배치.
+        /// 서는 방향은 처음 한 번 '테이블 → 씬의 XR Origin' 방향으로 정해 두고 계속 같은 쪽을 쓴다.
+        /// </summary>
+        public void RealignToTable()
+        {
+            if (alignUserToTable && TableLayout.TryGetTop(table, out var top))
+            {
+                var origin = UserAligner.FindOrigin();
+                if (origin != null)
+                {
+                    if (!_approachDir.HasValue)
+                    {
+                        var d = origin.transform.position - top.center;
+                        d.y = 0f;
+                        if (d.sqrMagnitude < 0.04f) d = top.yaw * Vector3.back;
+                        _approachDir = d.normalized;
+                    }
+                    if (UserAligner.HeadReady(origin))
+                    {
+                        UserAligner.Align(origin, top.center, standDistance, _approachDir.Value);
+                        _aligned = true;
+                    }
+                }
+            }
+            PlacePanels();
+            ApplyViewMode();
+        }
 
         static void EnsureEventSystem()
         {
-            if (FindFirstObjectByType<EventSystem>() != null) return;
+            if (FindAnyObjectByType<EventSystem>() != null) return;
             var go = new GameObject("EventSystem");
             go.AddComponent<EventSystem>();
             go.AddComponent<XRUIInputModule>();
@@ -106,6 +190,9 @@ namespace RobotWarehouse.App
             _pathView.playback = _playback;
             _heatmap = root.AddComponent<HeatmapLayer>();
             _heatmap.warehouse = _warehouse;
+            _inventory = root.AddComponent<InventoryView>();
+            _inventory.playback = _playback;
+            _inventory.warehouse = _warehouse;
             _rackEditor = root.AddComponent<RackGrabEditor>();
             _rackEditor.warehouse = _warehouse;
             _rackEditor.OnRackMoved += OnRackMoved;
@@ -120,17 +207,9 @@ namespace RobotWarehouse.App
         void BuildUI()
         {
             _ui = new MainPanels();
-            // 패널은 XR Origin을 따라다니게 한다 (이동·텔레포트해도 손 닿는 곳에 있음)
-            var cam = Camera.main;
-            Transform rig = cam != null ? cam.transform.root : null;
             var panelRoot = new GameObject("Panels").transform;
-            panelRoot.SetParent(rig, false);
             _ui.Build(panelRoot);
-            PlacePanel(_ui.Left.transform, leftPanelOffset);
-            PlacePanel(_ui.Right.transform, rightPanelOffset);
-
-            _ui.HostInput.text = AppConfig.Host;
-            _ui.PortInput.text = AppConfig.Port.ToString();
+            PlacePanels();
 
             _ui.ConnectButton.onClick.AddListener(Connect);
             _ui.OfflineButton.onClick.AddListener(PlayOffline);
@@ -179,6 +258,36 @@ namespace RobotWarehouse.App
             _ui.AnalyzeButton.onClick.AddListener(RequestAnalysis);
         }
 
+        Transform Rig => Camera.main != null ? Camera.main.transform.root : null;
+
+        Vector3 ViewerPosition()
+        {
+            var cam = Camera.main;
+            if (cam != null) return cam.transform.position;
+            return Rig != null ? Rig.position : Vector3.zero;
+        }
+
+        /// <summary>
+        /// 테이블이 있으면 테이블 양옆(사용자 쪽)에 패널을 세운다. 없으면 XR Origin 기준 고정 위치.
+        /// 오른손 B 버튼으로 현재 서 있는 위치 기준으로 다시 배치한다.
+        /// </summary>
+        void PlacePanels()
+        {
+            var left = _ui.Left.transform;
+            var right = _ui.Right.transform;
+            if (TableLayout.TryGetTop(table, out var top))
+            {
+                left.parent.SetParent(null, false);
+                float floorY = Rig != null ? Rig.position.y : 0f;
+                float width = ((RectTransform)left).sizeDelta.x * left.localScale.x;
+                TableLayout.PlacePanels(top, ViewerPosition(), floorY, panelHeight, width, left, right);
+                return;
+            }
+            left.parent.SetParent(Rig, false);
+            PlacePanel(left, leftPanelOffset);
+            PlacePanel(right, rightPanelOffset);
+        }
+
         void PlacePanel(Transform panel, Vector3 offset)
         {
             panel.localPosition = offset;
@@ -212,17 +321,23 @@ namespace RobotWarehouse.App
 
         // ------------------------------------------------------------------ 연결 (TC-VR-11)
 
-        void Connect()
+        /// <summary>실행 중에 다른 주소로 연결 (에디터 창 '지금 연결').</summary>
+        public void ConnectTo(string host, int port)
+        {
+            AppConfig.Override(host, port);
+            Connect();
+        }
+
+        public void Connect()
         {
             _offline = false;
-            AppConfig.Host = _ui.HostInput.text;
-            if (int.TryParse(_ui.PortInput.text, out var port)) AppConfig.Port = port;
             _api = new ApiClient(AppConfig.HttpBase);
             _ui.ConnectionStatus.text = $"연결 중… {AppConfig.HttpBase}";
             _ws.Connect(AppConfig.WsBase + ApiRoutes.WebSocket(AppConfig.SessionId));
             StartCoroutine(_api.Get(ApiRoutes.Health, r =>
             {
-                if (!r.Ok) _ui.Log($"<color=#FF8080>서버 응답 없음: {r.ErrorMessage}</color>");
+                if (!r.Ok) _ui.Log($"<color=#FF8080>서버 응답 없음 ({AppConfig.HttpBase}): {r.ErrorMessage}</color>\n" +
+                                   "에디터 메뉴 RobotWarehouse > 1. 서버 연결 에서 주소를 확인하세요.");
             }));
         }
 
@@ -663,6 +778,7 @@ namespace RobotWarehouse.App
 
         void ResetSimulation()
         {
+            _inventory.Clear();
             _simId = null;
             _fetchGeneration++;
             _playback.Begin(0);
@@ -676,7 +792,96 @@ namespace RobotWarehouse.App
         {
             _miniature = !_miniature;
             UIFactory.SetButtonText(_ui.ViewModeButton, _miniature ? "보기: 미니어처" : "보기: 실물 1:1");
-            ApplyViewMode();
+            if (_miniature)
+            {
+                SetLifeSizeVisuals(false, Vector3.zero, 0f);
+                RealignToTable();
+            }
+            else
+            {
+                ApplyViewMode();
+                PlacePanelsAroundViewer();
+                if (_warehouse.Map == null) _ui.Log("실물 보기: 창고를 만들거나 오프라인 재생을 누르면 발밑 2m 아래에 1:1로 펼쳐집니다");
+            }
+        }
+
+        /// <summary>실물 보기: 사용자 앞 좌우에 패널을 세운다 (지금 보는 방향 기준).</summary>
+        void PlacePanelsAroundViewer()
+        {
+            var cam = Camera.main;
+            if (cam == null) { PlacePanels(); return; }
+            var left = _ui.Left.transform;
+            var right = _ui.Right.transform;
+            left.parent.SetParent(null, false);
+            var fwd = cam.transform.forward; fwd.y = 0f;
+            if (fwd.sqrMagnitude < 1e-4f) fwd = Vector3.forward;
+            fwd.Normalize();
+            var rightDir = Vector3.Cross(Vector3.up, fwd);
+            float floorY = _groundY ?? (Rig != null ? Rig.position.y : 0f);
+            var basePos = cam.transform.position;
+            basePos.y = floorY + panelHeight;
+            foreach (var (panel, side) in new[] { (left, -1f), (right, 1f) })
+            {
+                var pos = basePos + fwd * 1.0f + rightDir * side * 0.95f;
+                panel.position = pos;
+                var look = pos - cam.transform.position; look.y = 0f;
+                panel.rotation = Quaternion.LookRotation(look, Vector3.up);
+            }
+        }
+
+        // ---------- 실물 보기 연출: 씬 바닥 숨김, 유리 바닥, 반투명 벽 ----------
+
+        readonly List<Renderer> _hiddenRenderers = new List<Renderer>();
+        GameObject _glassFloor;
+
+        IEnumerable<GameObject> LifeSizeHideTargets()
+        {
+            if (hideInLifeSize != null && hideInLifeSize.Length > 0)
+            {
+                foreach (var g in hideInLifeSize) if (g != null) yield return g;
+                yield break;
+            }
+            var floor = GameObject.Find("Floor");
+            if (floor != null && !floor.transform.IsChildOf(_warehouse.transform)) yield return floor;
+        }
+
+        void SetLifeSizeVisuals(bool life, Vector3 mapCenterWorld, float mapSpan)
+        {
+            // 씬 바닥·벽: 렌더러만 끄고 충돌체는 남긴다 (보이지 않는 안전 바닥과 함께 떨어지지 않음)
+            foreach (var r in _hiddenRenderers) if (r != null) r.enabled = true;
+            _hiddenRenderers.Clear();
+            if (life)
+            {
+                foreach (var g in LifeSizeHideTargets())
+                    foreach (var r in g.GetComponentsInChildren<Renderer>())
+                        if (r.enabled) { r.enabled = false; _hiddenRenderers.Add(r); }
+            }
+
+            // 발밑 유리 바닥 (서 있는 높이를 눈으로 알 수 있게)
+            if (life && glassFloorAlpha > 0f)
+            {
+                if (_glassFloor == null)
+                {
+                    _glassFloor = GameObject.CreatePrimitive(PrimitiveType.Quad);
+                    _glassFloor.name = "RW_GlassFloor";
+                    Destroy(_glassFloor.GetComponent<Collider>());
+                    var mat = new Material(MaterialLibrary.Overlay) { name = "GlassFloor" };
+                    _glassFloor.GetComponent<Renderer>().sharedMaterial = mat;
+                }
+                var gm = _glassFloor.GetComponent<Renderer>().sharedMaterial;
+                MaterialLibrary.SetMaterialColor(gm, new Color(0.6f, 0.85f, 1f, glassFloorAlpha));
+                float floorY = _groundY ?? 0f;
+                _glassFloor.transform.position = new Vector3(mapCenterWorld.x, floorY + 0.003f, mapCenterWorld.z);
+                _glassFloor.transform.rotation = Quaternion.Euler(90f, 0f, 0f);
+                _glassFloor.transform.localScale = new Vector3(mapSpan + 10f, mapSpan + 10f, 1f);
+                _glassFloor.SetActive(true);
+            }
+            else if (_glassFloor != null)
+            {
+                _glassFloor.SetActive(false);
+            }
+
+            _warehouse.SetWallsTranslucent(life && translucentWallsInLifeSize);
         }
 
         /// <summary>미니어처: 테이블 위 축소 모형 / 실물: 바닥에 1:1, 사용자 앞 남쪽 가장자리에서 시작.</summary>
@@ -685,20 +890,51 @@ namespace RobotWarehouse.App
             var map = _warehouse.Map;
             if (map == null) return;
             var t = _warehouse.transform;
-            var center = GridCoord.GridCenterLocal(map.width, map.height, map.cellSizeM);
+            float cs = map.cellSizeM;
+            var center = GridCoord.GridCenterLocal(map.width, map.height, cs);
+            float mapW = map.width * cs, mapH = map.height * cs;
+            bool hasTable = TableLayout.TryGetTop(table, out var top);
+            var viewer = ViewerPosition();
+
             if (_miniature)
             {
-                float longest = Mathf.Max(map.width, map.height) * map.cellSizeM;
-                float s = miniatureSize / Mathf.Max(1f, longest);
-                t.localScale = Vector3.one * s;
-                t.position = tableCenter - center * s;
+                if (hasTable)
+                {
+                    // 테이블 윗면 중앙에, 테이블 방향에 맞춰, 윗면 크기에 맞는 축척으로
+                    var q = TableLayout.ChooseMapRotation(top, mapW, mapH, viewer);
+                    float s = TableLayout.FitScale(top, q, mapW, mapH, tableMargin);
+                    t.rotation = q;
+                    t.localScale = Vector3.one * s;
+                    t.position = top.center + Vector3.up * 0.005f - q * (center * s);
+                }
+                else
+                {
+                    float s = miniatureSize / Mathf.Max(1f, Mathf.Max(mapW, mapH));
+                    t.rotation = Quaternion.identity;
+                    t.localScale = Vector3.one * s;
+                    t.position = tableCenter - center * s;
+                }
             }
             else
             {
+                // 실물(관제 보기): 1:1 창고를 사용자 바닥보다 depth 만큼 아래에 두고 위에서 내려다본다.
+                // 무인 창고라 사람이 창고 바닥에 내려가지 않는다는 전제. 사용자는 보이지 않는 바닥 위에 선다.
                 t.localScale = Vector3.one;
-                t.position = new Vector3(-center.x, 0f, 1.5f);
+                var cam = Camera.main;
+                var fwd = cam != null ? cam.transform.forward : Vector3.forward;
+                fwd.y = 0f;
+                if (fwd.sqrMagnitude < 1e-4f) fwd = Vector3.forward;
+                var q = Quaternion.LookRotation(fwd.normalized, Vector3.up);
+                float floorY = _groundY ?? (Rig != null ? Rig.position.y : 0f);
+                float depth = autoDepth ? Mathf.Max(lifeSizeDepth, _warehouse.TallestHeight + 0.3f) : lifeSizeDepth;
+                var stand = cam != null ? cam.transform.position : (Rig != null ? Rig.position : Vector3.zero);
+                // 사용자 바로 앞(0.5m)에서 창고 남쪽 가장자리가 시작되도록
+                var anchor = new Vector3(stand.x, floorY - depth, stand.z) + q * Vector3.forward * 0.5f;
+                t.rotation = q;
+                t.position = anchor - q * new Vector3(center.x, 0f, -0.5f * cs);
+                SetLifeSizeVisuals(true, t.position + q * center, Mathf.Max(mapW, mapH));
             }
-            t.rotation = Quaternion.identity;
+            if (_miniature) SetLifeSizeVisuals(false, Vector3.zero, 0f);
             if (table != null) table.SetActive(_miniature);
         }
 
@@ -760,15 +996,96 @@ namespace RobotWarehouse.App
             if (!a && _prevA) EndVoice();
             _prevA = a;
 
+            // 오른손 B 버튼: 미니어처 보기면 테이블 앞으로 다시 맞춤, 실물 보기면 패널만 지금 위치 기준으로
+            bool b = XRSupport.RightButton(UnityEngine.XR.CommonUsages.secondaryButton);
+            if (b && !_prevB)
+            {
+                if (_miniature) RealignToTable(); else PlacePanelsAroundViewer();
+            }
+            _prevB = b;
+            // 헤드셋 추적이 늦게 잡히면 그때 한 번 맞춘다
+            if (!_aligned && alignUserToTable && table != null && Time.frameCount % 15 == 0)
+            {
+                var o = UserAligner.FindOrigin();
+                if (o != null && UserAligner.HeadReady(o)) RealignToTable();
+            }
+
+            // 안전장치: 바닥 아래로 떨어지면 원래 높이로 되돌리고 다시 맞춘다
+            if (_groundY.HasValue && Time.frameCount % 10 == 0)
+            {
+                var o = UserAligner.FindOrigin();
+                if (o != null && o.transform.position.y < _groundY.Value - 2f)
+                {
+                    UserAligner.EnsureGround(o);
+                    var p = o.transform.position;
+                    UserAligner.Teleport(o, () => o.transform.position = new Vector3(p.x, _groundY.Value, p.z));
+                    Debug.LogWarning("[RobotWarehouse] XR Origin이 바닥 아래로 떨어져 원래 높이로 되돌렸습니다");
+                    _realignRequested = true;
+                }
+            }
+
+            if (_realignRequested)
+            {
+                _realignRequested = false;
+                if (_miniature) RealignToTable();
+            }
+
+            UpdatePlaybackUi();
+        }
+
+        // ---------- 재생 UI 갱신 (값이 바뀔 때만 → 캔버스 레이아웃 재계산 최소화) ----------
+
+        int _uiStep = -1, _uiTotal = -1, _uiLoaded = -1;
+        bool _uiBuffering, _uiPlaying;
+        string _uiSelected;
+        float _fpsTimer;
+        int _fpsFrames, _fps;
+
+        void UpdatePlaybackUi()
+        {
+            // 프레임 수(FPS)는 0.5초마다 측정 — Quest 성능 확인용
+            _fpsFrames++;
+            _fpsTimer += Time.unscaledDeltaTime;
+            bool fpsChanged = false;
+            if (_fpsTimer >= 0.5f)
+            {
+                int fps = Mathf.RoundToInt(_fpsFrames / _fpsTimer);
+                fpsChanged = fps != _fps;
+                _fps = fps;
+                _fpsFrames = 0;
+                _fpsTimer = 0f;
+            }
+
             var tl = _playback.Timeline;
-            _updatingSlider = true;
-            _ui.StepSlider.maxValue = Mathf.Max(1, tl.TotalSteps);
-            _ui.StepSlider.value = tl.Time;
-            _updatingSlider = false;
-            string buffering = tl.IsBuffering ? "  (프레임 받는 중)" : "";
-            _ui.StepText.text = $"스텝 {tl.CurrentStep} / {tl.TotalSteps}   받은 프레임 {tl.LoadedUntil + 1}{buffering}";
-            UIFactory.SetButtonText(_ui.PlayButton, tl.Playing ? "일시정지" : "재생");
-            _ui.SelectedRobotText.text = _playback.SelectedRobot ?? MainPanels.WaitSelectRobot;
+            int step = tl.CurrentStep;
+            // 슬라이더는 스텝이 바뀔 때만 움직인다 (매 프레임 값 변경은 UI를 계속 다시 그리게 함)
+            if (step != _uiStep || tl.TotalSteps != _uiTotal)
+            {
+                _updatingSlider = true;
+                _ui.StepSlider.maxValue = Mathf.Max(1, tl.TotalSteps);
+                _ui.StepSlider.value = step;
+                _updatingSlider = false;
+            }
+            if (step != _uiStep || tl.TotalSteps != _uiTotal || tl.LoadedUntil != _uiLoaded || tl.IsBuffering != _uiBuffering || fpsChanged)
+            {
+                string buffering = tl.IsBuffering ? "  (프레임 받는 중)" : "";
+                _ui.StepText.text = $"스텝 {step} / {tl.TotalSteps}   받은 프레임 {tl.LoadedUntil + 1}{buffering}   {_fps} fps";
+                _uiStep = step;
+                _uiTotal = tl.TotalSteps;
+                _uiLoaded = tl.LoadedUntil;
+                _uiBuffering = tl.IsBuffering;
+            }
+            if (tl.Playing != _uiPlaying || _uiSelected == null)
+            {
+                UIFactory.SetButtonText(_ui.PlayButton, tl.Playing ? "일시정지" : "재생");
+                _uiPlaying = tl.Playing;
+            }
+            var sel = _playback.SelectedRobot ?? MainPanels.WaitSelectRobot;
+            if (sel != _uiSelected)
+            {
+                _ui.SelectedRobotText.text = sel;
+                _uiSelected = sel;
+            }
         }
     }
 }

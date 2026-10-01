@@ -1,0 +1,18 @@
+fileFormatVersion: 2
+guid: ee5f39c5d8570ff4099153ac70495cfb
+MonoImporter:
+  externalObjects: {}
+  serializedVersion: 2
+  defaultReferences: []
+  executionOrder: 0
+  icon: {instanceID: 0}
+  userData: 
+  assetBundleName: 
+  assetBundleVariant: 
+AssetOrigin:
+  serializedVersion: 1
+  productId: 190538
+  packageName: Megapol.Art Vintage Control Room
+  packageVersion: 1.0
+  assetPath: Assets/Megapoly.Art/Vintage Controls/Scripts/ButtonLamp.cs
+  uploadId: 420836

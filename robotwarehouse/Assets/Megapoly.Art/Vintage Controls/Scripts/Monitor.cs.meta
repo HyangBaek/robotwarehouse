@@ -1,0 +1,18 @@
+fileFormatVersion: 2
+guid: 681f62a0235015342b909cdc207eb945
+MonoImporter:
+  externalObjects: {}
+  serializedVersion: 2
+  defaultReferences: []
+  executionOrder: 0
+  icon: {instanceID: 0}
+  userData: 
+  assetBundleName: 
+  assetBundleVariant: 
+AssetOrigin:
+  serializedVersion: 1
+  productId: 190538
+  packageName: Megapol.Art Vintage Control Room
+  packageVersion: 1.0
+  assetPath: Assets/Megapoly.Art/Vintage Controls/Scripts/Monitor.cs
+  uploadId: 420836

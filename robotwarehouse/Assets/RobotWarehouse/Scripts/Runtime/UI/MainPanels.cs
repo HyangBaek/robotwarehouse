@@ -27,7 +27,6 @@ namespace RobotWarehouse.UI
         public Canvas Left, Right;
 
         // 연결
-        public InputField HostInput, PortInput;
         public Button ConnectButton, OfflineButton, ViewModeButton;
         public Text ConnectionStatus;
 
@@ -81,17 +80,11 @@ namespace RobotWarehouse.UI
             var title = UIFactory.Label(root, "로봇웨어하우스 · Agent", UIFactory.FontTitle + 6, UIFactory.TextMain, TextAnchor.MiddleCenter);
             title.fontStyle = FontStyle.Bold;
 
-            // 연결
-            var conn = UIFactory.Section(root, "서버 연결");
-            var row = UIFactory.Row(conn);
-            HostInput = UIFactory.Input(row, "서버 IP");
-            PortInput = UIFactory.Input(row, "포트", 64, false, InputField.ContentType.IntegerNumber);
-            PortInput.GetComponent<LayoutElement>().preferredWidth = 140;
-            PortInput.GetComponent<LayoutElement>().flexibleWidth = 0;
-            ConnectButton = UIFactory.Button(row, "연결", null, null, 150);
-            BuildKeypad(conn, HostInput);
+            // 연결 (주소는 에디터 메뉴 RobotWarehouse > 1. 서버 연결 에서 지정)
+            var conn = UIFactory.Section(root, "서버");
             ConnectionStatus = UIFactory.Label(conn, "연결 안 됨", UIFactory.FontSmall, UIFactory.TextDim);
             var row2 = UIFactory.Row(conn);
+            ConnectButton = UIFactory.Button(row2, "다시 연결", null, UIFactory.ButtonAlt);
             OfflineButton = UIFactory.Button(row2, "오프라인 재생", null, UIFactory.ButtonAlt);
             ViewModeButton = UIFactory.Button(row2, "보기: 미니어처", null, UIFactory.ButtonAlt);
 
@@ -129,21 +122,6 @@ namespace RobotWarehouse.UI
             RetryButton.gameObject.SetActive(false);
         }
 
-        void BuildKeypad(Transform parent, InputField target)
-        {
-            // Quest에서 IP를 넣기 위한 숫자 패드 (시스템 키보드가 안 뜰 때 대비)
-            var keys = UIFactory.Row(parent, 52, 4);
-            foreach (var k in new[] { "1", "2", "3", "4", "5", "6", "7", "8", "9", "0", ".", "←" })
-            {
-                var key = k;
-                UIFactory.Button(keys, key, () =>
-                {
-                    if (key == "←") { if (target.text.Length > 0) target.text = target.text.Substring(0, target.text.Length - 1); }
-                    else target.text += key;
-                }, UIFactory.ButtonAlt);
-            }
-        }
-
         void BuildRight(Transform root)
         {
             var title = UIFactory.Label(root, "시뮬레이션", UIFactory.FontTitle + 6, UIFactory.TextMain, TextAnchor.MiddleCenter);
@@ -166,6 +144,8 @@ namespace RobotWarehouse.UI
                 SpeedButtons[i] = UIFactory.Button(r1, $"{Speeds[i]:0}x", null, UIFactory.ButtonAlt);
             StepSlider = UIFactory.Slider(pb);
             StepText = UIFactory.Label(pb, "스텝 0 / 0", UIFactory.FontSmall, UIFactory.TextDim);
+            // 자주 바뀌는 글자는 하위 캔버스로 분리 → 바뀔 때 패널 전체를 다시 그리지 않음 (Quest 프레임 유지)
+            StepText.gameObject.AddComponent<Canvas>();
             var r2 = UIFactory.Row(pb);
             HeatmapButton = UIFactory.Button(r2, "히트맵: 끔", null, UIFactory.ButtonAlt);
             MetricButton = UIFactory.Button(r2, "지표: 대기", null, UIFactory.ButtonAlt);

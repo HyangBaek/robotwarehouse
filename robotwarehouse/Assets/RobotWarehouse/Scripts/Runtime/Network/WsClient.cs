@@ -31,6 +31,7 @@ namespace RobotWarehouse.Network
         string _url;
         bool _wantConnected;
         bool _everConnected;
+        bool _warned;   // 재연결 실패 경고는 연결될 때까지 한 번만
         float _nextRetryTime;
         Task _loop;
 
@@ -94,6 +95,7 @@ namespace RobotWarehouse.Network
                     await socket.ConnectAsync(new Uri(_url), timeout.Token);
                 }
                 _everConnected = true;
+                _warned = false;
                 SetState(WsState.Connected);
 
                 var buffer = new byte[16 * 1024];
@@ -118,7 +120,8 @@ namespace RobotWarehouse.Network
             catch (OperationCanceledException) { }
             catch (Exception e)
             {
-                Debug.LogWarning($"[WS] {e.GetType().Name}: {e.Message}");
+                if (!_warned) Debug.LogWarning($"[WS] {_url} 연결 실패, 5초마다 다시 시도합니다: {e.Message}");
+                _warned = true;
             }
             finally
             {

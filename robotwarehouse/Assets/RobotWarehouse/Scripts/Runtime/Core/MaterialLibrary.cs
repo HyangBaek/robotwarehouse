@@ -28,7 +28,7 @@ namespace RobotWarehouse.Core
 
         static MaterialLibrary Find()
         {
-            if (Instance == null) Instance = Object.FindFirstObjectByType<MaterialLibrary>();
+            if (Instance == null) Instance = Object.FindAnyObjectByType<MaterialLibrary>();
             return Instance;
         }
 

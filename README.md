@@ -11,29 +11,52 @@
 
 ---
 
-## 1. 빠른 시작 (에디터에서 5분)
+## 1. 빠른 시작 (에디터)
 
-1. **Unity 열기** → `robotwarehouse` 프로젝트. `Packages/manifest.json`에 Newtonsoft JSON 패키지를 추가해 두었으니 처음 열 때 자동 설치됩니다.
-2. 메뉴 **RobotWarehouse → 1. 시연 씬 만들기** → `Assets/RobotWarehouse/Scenes/RobotWarehouse.unity` 생성, 빌드 목록 첫 번째로 등록.
-3. **모의 서버 실행** (새 터미널)
+시연 씬은 `Assets/Scenes/MainScene.unity`(빌드 첫 번째 씬)입니다. 상단 **RobotWarehouse** 메뉴로 설정합니다.
+
+| 메뉴 | 하는 일 |
+|---|---|
+| **1. 서버 연결** | 서버 주소·포트 입력 → 저장(`Resources/ServerConfig.asset`). 연결 테스트, Play 중 바로 연결 |
+| **2. 창고 에셋 적용 (Unity Warehouse → URP)** | My Assets의 Unity Warehouse(HDRP) 선반·Palletrobot·상자를 URP 사본으로 변환해 적용 |
+| **3. Quest 빌드 설정 적용** | HTTP 허용, 인터넷 권한, minSdk 32, IL2CPP ARM64 |
+| **4. 모의 서버 실행 방법 보기** | 서버 실행 명령 안내 |
+
+1. 모의 서버 실행 (새 터미널)
    ```bash
    cd D:\hyang\robotwarehouse\mock_server
    pip install -r requirements.txt
    uvicorn server:app --host 0.0.0.0 --port 8000
    ```
-4. Play → 왼쪽 패널에 서버 IP `127.0.0.1` 입력 → **연결** → 예시 버튼 **W2** → **창고 생성** → **지도 확인** → 오른쪽 패널 **실행**.
+2. **RobotWarehouse → 1. 서버 연결** → `127.0.0.1` / `8000` → 저장 → 연결 테스트
+3. **RobotWarehouse → 2. 창고 에셋 적용** (처음 한 번)
+4. MainScene에서 Play → 앱이 저장된 주소로 자동 연결 → **W2 → 창고 생성 → 지도 확인 → 실행**
    - 에디터 조작: 마우스 왼쪽 = UI 클릭, 오른쪽 드래그 = 둘러보기, WASD/QE = 이동
-   - 서버 없이 보기: **오프라인 재생** (W2 + S2 결과 내장)
+   - 서버 없이 보기: **오프라인 재생**
 
 ## 2. Quest 2 빌드
 
-1. 메뉴 **RobotWarehouse → 2. Quest 빌드 설정 적용** (HTTP 허용, 인터넷 권한, minSdk 32, IL2CPP ARM64)
-2. Project Settings → XR Plug-in Management → **Android 탭 → OpenXR** 체크, OpenXR Feature Groups에서 **Meta Quest Support** 켬 (템플릿 기본값 확인만)
-3. File → Build Profiles → Android → Switch Platform → Quest 2 연결 → **Build And Run**
-4. 노트북과 Quest 2를 같은 Wi-Fi에 연결, 노트북 IP(`ipconfig`의 IPv4)를 VR 패널 숫자 패드로 입력 → 연결
+1. **RobotWarehouse → 3. Quest 빌드 설정 적용**
+2. **1. 서버 연결**에 노트북의 Wi-Fi IP(`ipconfig`의 IPv4) 저장 → 빌드에 포함됨
+3. Project Settings → XR Plug-in Management → Android 탭 → OpenXR, Meta Quest Support 켬 (템플릿 기본값 확인)
+4. File → Build Profiles → Android → Build And Run
    - Windows 방화벽에서 Python(uvicorn) 8000 포트 인바운드를 허용해야 Quest가 접속됩니다.
+   - IP가 바뀌면 다시 저장하고 빌드해야 합니다. VR 패널의 **다시 연결**은 저장된 주소로 재시도합니다.
 
 > minSdk 32는 Quest 2 설치 호환을 위해 템플릿 기본값(34)에서 낮춘 값입니다. 대여 기기 OS 버전에서 설치가 되는지 한 번 확인해 주세요 [검증 필요].
+
+## 2-1. 3D 에셋 (Unity Warehouse)
+
+| 원본 (HDRP) | 변환 결과 (URP) | 쓰임 |
+|---|---|---|
+| Shelf | `AssetSkin/Prefabs/RW_Shelf` | 랙 줄 길이에 맞춰 이어 붙임, 랙 높이 = 단 수 × 0.7m |
+| Palletrobot | `RW_Palletrobot` | 로봇. 진행 방향으로 회전, 머리 위 원판 색 = 상태 |
+| Cardboard A1~C2 | `RW_Cardboard_*` | 선반 위 상자(boxFill 비율), 로봇 적재 표시 |
+| Pallet | `RW_Pallet` | 예비 |
+
+- 원본 에셋 파일은 수정하지 않습니다. 단, 선반·상자 FBX의 **Read/Write**를 켭니다(실행 중 정적 배칭용).
+- 설정은 `Assets/RobotWarehouse/Resources/WarehouseSkin.asset`: `useSkin` 끄면 기본 도형으로 복귀, `boxFill`로 상자 양, `robotYawOffset`으로 로봇 정면 보정.
+- 셰이더 그래프의 라벨·마스크 효과는 URP Lit로 옮기지 않아 원본보다 단순하게 보입니다.
 
 ## 3. VR 조작
 
@@ -74,7 +97,7 @@ VR 클라이언트에는 경로 계산 코드가 없습니다(NFR-02). 모든 �
 ## 6. 남은 일·제약
 
 - 실제 서버(`docs/api.md`)가 확정되면 `docs/vr_client_api.md`의 **가정** 항목을 맞춰야 합니다 (WebSocket 경로, `/compare`, 음성 답변의 `question_id`, `status`·`confirmed`·`replan_from` 필드).
-- Quest 2 시스템 키보드가 뜨지 않으면 한글 입력은 음성·예시 버튼(W1~W6)으로 합니다. IP는 숫자 패드로 입력합니다.
+- Quest 2 시스템 키보드가 뜨지 않으면 한글 입력은 음성·예시 버튼(W1~W6)으로 합니다. 서버 주소는 에디터 메뉴 1. 서버 연결에서 지정합니다.
 - 실기기 FPS(NFR-01)는 아직 측정 전입니다. 로봇·블록은 색별 공유 머티리얼(SRP Batcher), 히트맵은 텍스처 1장, 그림자 끔.
 - 오프라인 재생 데이터(`Resources/Offline/*.json`)는 모의 엔진 결과입니다. 실제 엔진 결과로 바꾸려면 같은 형식으로 덮어쓰거나 `python mock_server/make_offline.py`를 참고합니다.
 

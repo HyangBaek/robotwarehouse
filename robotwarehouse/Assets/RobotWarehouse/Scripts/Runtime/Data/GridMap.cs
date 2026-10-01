@@ -76,7 +76,6 @@ namespace RobotWarehouse.Data
     /// 격자 지도 (DR-01). VR·엔진·Agent가 함께 쓰는 단일 데이터 계약.
     /// cells에 없는 칸은 aisle로 본다.
     /// </summary>
-    [Serializable]
     public class GridMap
     {
         public const string SupportedSchemaVersion = "1.0";

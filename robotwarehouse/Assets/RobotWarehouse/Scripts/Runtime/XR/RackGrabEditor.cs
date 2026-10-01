@@ -39,6 +39,7 @@ namespace RobotWarehouse.XR
             foreach (var kv in warehouse.RackObjects)
             {
                 var go = kv.Value;
+                go.GetComponent<Renderer>().enabled = true;   // 3D 에셋 사용 중에도 편집 중에는 박스를 보여 준다
                 var rb = go.GetComponent<Rigidbody>();
                 if (rb == null) rb = go.AddComponent<Rigidbody>();
                 rb.isKinematic = true;
@@ -60,6 +61,8 @@ namespace RobotWarehouse.XR
             foreach (var c in _added) if (c is XRGrabInteractable) Destroy(c);
             foreach (var c in _added) if (c is Rigidbody) Destroy(c);
             _added.Clear();
+            if (warehouse != null)
+                foreach (var kv in warehouse.RackObjects) if (kv.Value != null) kv.Value.GetComponent<Renderer>().enabled = false;
         }
 
         void OnReleased(SelectExitEventArgs args)
