@@ -1,0 +1,8 @@
+{
+ "scenario_id": "S1",
+ "map_version": "w1",
+ "robots": 2,
+ "inbound": 10,
+ "outbound": 10,
+ "seed": 42
+}

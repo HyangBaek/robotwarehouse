@@ -3,6 +3,13 @@
 > VR·경로 엔진·Agent가 함께 쓰는 단일 데이터 계약입니다. 스키마를 바꾸면 이 문서와 `schema_version`을 함께 올립니다.
 > 현재 VR 클라이언트가 지원하는 버전: `1.0` (`GridMap.SupportedSchemaVersion`). 다르면 VR 패널에 경고가 뜹니다.
 
+> 변경 시: 1) `schema_version` 올림 2) 이 문서 수정 3) 팀 채널에 공지 4) server/schema, unity Messages 동시 수정
+
+- 칸 크기: 1m × 1m (로봇 1대)
+- 좌표: 격자 (x, y) → Unity (x, 0, y), 원점은 창고 왼쪽 아래 모서리 칸의 중심
+- 칸 유형: aisle / rack / wall / dock_in / dock_out / charge (지정하지 않은 칸은 aisle)
+- 예시: `server/tests/fixtures/maps/w1_small.json`
+
 ## 1. 좌표 규칙 (VR 구현 기준, TC-VR-01)
 
 | 항목 | 규칙 |

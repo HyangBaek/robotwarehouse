@@ -1,0 +1,266 @@
+{
+ "schema_version": "1.0",
+ "cell_size_m": 1.0,
+ "width": 12,
+ "height": 9,
+ "cells": [
+  {
+   "x": 0,
+   "y": 0,
+   "type": "wall"
+  },
+  {
+   "x": 1,
+   "y": 0,
+   "type": "wall"
+  },
+  {
+   "x": 2,
+   "y": 0,
+   "type": "wall"
+  },
+  {
+   "x": 3,
+   "y": 0,
+   "type": "wall"
+  },
+  {
+   "x": 4,
+   "y": 0,
+   "type": "wall"
+  },
+  {
+   "x": 5,
+   "y": 0,
+   "type": "wall"
+  },
+  {
+   "x": 6,
+   "y": 0,
+   "type": "wall"
+  },
+  {
+   "x": 7,
+   "y": 0,
+   "type": "wall"
+  },
+  {
+   "x": 8,
+   "y": 0,
+   "type": "wall"
+  },
+  {
+   "x": 9,
+   "y": 0,
+   "type": "wall"
+  },
+  {
+   "x": 10,
+   "y": 0,
+   "type": "wall"
+  },
+  {
+   "x": 11,
+   "y": 0,
+   "type": "wall"
+  },
+  {
+   "x": 0,
+   "y": 8,
+   "type": "wall"
+  },
+  {
+   "x": 1,
+   "y": 8,
+   "type": "wall"
+  },
+  {
+   "x": 2,
+   "y": 8,
+   "type": "wall"
+  },
+  {
+   "x": 3,
+   "y": 8,
+   "type": "wall"
+  },
+  {
+   "x": 4,
+   "y": 8,
+   "type": "wall"
+  },
+  {
+   "x": 5,
+   "y": 8,
+   "type": "wall"
+  },
+  {
+   "x": 6,
+   "y": 8,
+   "type": "wall"
+  },
+  {
+   "x": 7,
+   "y": 8,
+   "type": "wall"
+  },
+  {
+   "x": 8,
+   "y": 8,
+   "type": "wall"
+  },
+  {
+   "x": 9,
+   "y": 8,
+   "type": "wall"
+  },
+  {
+   "x": 10,
+   "y": 8,
+   "type": "wall"
+  },
+  {
+   "x": 11,
+   "y": 8,
+   "type": "wall"
+  },
+  {
+   "x": 0,
+   "y": 4,
+   "type": "dock_in"
+  },
+  {
+   "x": 11,
+   "y": 4,
+   "type": "dock_out"
+  },
+  {
+   "x": 2,
+   "y": 2,
+   "type": "rack",
+   "rack_id": "R01"
+  },
+  {
+   "x": 2,
+   "y": 3,
+   "type": "rack",
+   "rack_id": "R01"
+  },
+  {
+   "x": 2,
+   "y": 4,
+   "type": "rack",
+   "rack_id": "R01"
+  },
+  {
+   "x": 2,
+   "y": 5,
+   "type": "rack",
+   "rack_id": "R01"
+  },
+  {
+   "x": 2,
+   "y": 6,
+   "type": "rack",
+   "rack_id": "R01"
+  },
+  {
+   "x": 5,
+   "y": 2,
+   "type": "rack",
+   "rack_id": "R02"
+  },
+  {
+   "x": 5,
+   "y": 3,
+   "type": "rack",
+   "rack_id": "R02"
+  },
+  {
+   "x": 5,
+   "y": 4,
+   "type": "rack",
+   "rack_id": "R02"
+  },
+  {
+   "x": 5,
+   "y": 5,
+   "type": "rack",
+   "rack_id": "R02"
+  },
+  {
+   "x": 5,
+   "y": 6,
+   "type": "rack",
+   "rack_id": "R02"
+  },
+  {
+   "x": 8,
+   "y": 2,
+   "type": "rack",
+   "rack_id": "R03"
+  },
+  {
+   "x": 8,
+   "y": 3,
+   "type": "rack",
+   "rack_id": "R03"
+  },
+  {
+   "x": 8,
+   "y": 4,
+   "type": "rack",
+   "rack_id": "R03"
+  },
+  {
+   "x": 8,
+   "y": 5,
+   "type": "rack",
+   "rack_id": "R03"
+  },
+  {
+   "x": 8,
+   "y": 6,
+   "type": "rack",
+   "rack_id": "R03"
+  }
+ ],
+ "racks": [
+  {
+   "rack_id": "R01",
+   "levels": 3,
+   "slot_spec": "pallet_1100x1100",
+   "capacity": 15
+  },
+  {
+   "rack_id": "R02",
+   "levels": 3,
+   "slot_spec": "pallet_1100x1100",
+   "capacity": 15
+  },
+  {
+   "rack_id": "R03",
+   "levels": 3,
+   "slot_spec": "pallet_1100x1100",
+   "capacity": 15
+  }
+ ],
+ "docks": [
+  {
+   "dock_id": "IN1",
+   "type": "dock_in",
+   "x": 0,
+   "y": 4
+  },
+  {
+   "dock_id": "OUT1",
+   "type": "dock_out",
+   "x": 11,
+   "y": 4
+  }
+ ],
+ "rules": {
+  "one_way": [],
+  "passing_allowed": []
+ }
+}
