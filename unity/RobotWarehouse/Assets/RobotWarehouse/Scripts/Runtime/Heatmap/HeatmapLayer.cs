@@ -7,7 +7,7 @@ using UnityEngine;
 namespace RobotWarehouse.Heatmap
 {
     /// <summary>
-    /// 칸별 통과·대기 히트맵 (FR-24). 칸마다 오브젝트를 만들지 않고
+    /// 칸별 통과, 대기 히트맵 (FR-24). 칸마다 오브젝트를 만들지 않고
     /// 격자 크기 Texture2D 한 장에 픽셀로 칠해 바닥 위 평면에 입힌다.
     /// </summary>
     public class HeatmapLayer : MonoBehaviour
@@ -62,7 +62,7 @@ namespace RobotWarehouse.Heatmap
             warehouse.HeatmapQuad.gameObject.SetActive(Visible);
         }
 
-        /// <summary>대기 합계 (개선 전·후 비교용).</summary>
+        /// <summary>대기 합계 (개선 전, 후 비교용).</summary>
         public int TotalWait()
         {
             int sum = 0;

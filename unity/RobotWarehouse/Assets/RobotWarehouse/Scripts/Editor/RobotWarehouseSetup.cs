@@ -6,8 +6,8 @@ namespace RobotWarehouse.EditorTools
 {
     /// <summary>
     /// RobotWarehouse 메뉴
-    ///   1. 서버 연결                          → ServerConnectWindow
-    ///   2. 창고 에셋 적용 (Unity Warehouse → URP) → WarehouseAssetConverter
+    ///   1. 서버 연결                        -> ServerConnectWindow
+    ///   2. 창고 에셋 적용 (Unity Warehouse -> URP) -> WarehouseAssetConverter
     ///   3. Quest 빌드 설정 적용
     ///   4. 모의 서버 실행 방법 보기
     /// 시연 씬은 MainScene(빌드 첫 번째 씬)을 쓴다.

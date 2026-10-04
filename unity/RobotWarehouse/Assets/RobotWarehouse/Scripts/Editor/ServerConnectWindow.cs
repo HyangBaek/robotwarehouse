@@ -94,7 +94,7 @@ namespace RobotWarehouse.EditorTools
             }
         }
 
-        /// <summary>"http://1.2.3.4:8000/" 같은 입력도 받아 호스트·포트로 나눈다.</summary>
+        /// <summary>"http://1.2.3.4:8000/" 같은 입력도 받아 호스트, 포트로 나눈다.</summary>
         void ParseHost(string input)
         {
             var s = (input ?? "").Trim();

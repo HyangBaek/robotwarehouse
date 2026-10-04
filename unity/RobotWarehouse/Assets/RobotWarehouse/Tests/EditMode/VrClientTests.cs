@@ -48,7 +48,7 @@ namespace RobotWarehouse.Tests
                 Assert.AreEqual(jsonRacks, r.RackCount);
                 Assert.AreEqual(jsonWalls, r.WallCount);
                 Assert.AreEqual(jsonRacks, map.CountCells(CellType.Rack));
-                // 칸 좌표 → 월드 좌표 일치 (TC-VR-13 자동화 버전)
+                // 칸 좌표 -> 월드 좌표 일치 (TC-VR-13 자동화 버전)
                 foreach (var kv in r.RackObjects)
                 {
                     var p = kv.Value.transform.localPosition;
@@ -103,7 +103,7 @@ namespace RobotWarehouse.Tests
         {
             var tl = new FrameTimeline { StepsPerSecond = 10f };
             tl.Reset(500);
-            tl.AddFrames(TwoFrames());   // t=10,11만 있음 → 0부터 연속 아님
+            tl.AddFrames(TwoFrames());   // t=10,11만 있음 -> 0부터 연속 아님
             tl.Playing = true;
             tl.Advance(1f);
             Assert.AreEqual(0f, tl.Time);
@@ -170,14 +170,14 @@ namespace RobotWarehouse.Tests
             Assert.IsFalse(RackPlacement.CanPlace(map, dock.x, dock.y));
             Assert.IsFalse(RackPlacement.CanPlace(map, rack.x, rack.y));
             Assert.IsFalse(RackPlacement.CanPlace(map, -1, 0));
-            // 칸 경계 근처(0.4칸 벗어남) → 가장 가까운 칸 중심으로 스냅
+            // 칸 경계 근처(0.4칸 벗어남) -> 가장 가까운 칸 중심으로 스냅
             Assert.AreEqual(aisle, GridCoord.LocalToCell(GridCoord.CellToLocal(aisle.x + 0.4f, aisle.y - 0.4f)));
             Assert.IsTrue(map.MoveRackCell(rack.x, rack.y, aisle.x, aisle.y));
             Assert.AreEqual(CellType.Rack, map.GetCell(aisle.x, aisle.y));
             Assert.AreEqual(CellType.Aisle, map.GetCell(rack.x, rack.y));
         }
 
-        [Test] // IR-02 메시지 파싱: 최상위·data 아래 모두
+        [Test] // IR-02 메시지 파싱: 최상위, data 아래 모두
         public void ServerMessage_ReadsFlatAndNested()
         {
             var a = ServerMessage.Parse("{\"type\":\"question\",\"question_id\":\"Q1\",\"error_cells\":[[4,2],[5,2]]}");

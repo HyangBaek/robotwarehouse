@@ -84,7 +84,7 @@ namespace RobotWarehouse.XR
                     OnRejected?.Invoke($"({to.x},{to.y})에는 랙을 놓을 수 없어요 ({CellTypeNames.ToName(warehouse.Map.GetCell(to.x, to.y))})");
                 to = from;
             }
-            // 칸 중심·바닥 높이로 스냅
+            // 칸 중심, 바닥 높이로 스냅
             float h = go.transform.localScale.y * 0.5f;
             go.transform.localPosition = GridCoord.CellToLocal(to.x, to.y, cs, h);
             go.transform.localRotation = Quaternion.identity;

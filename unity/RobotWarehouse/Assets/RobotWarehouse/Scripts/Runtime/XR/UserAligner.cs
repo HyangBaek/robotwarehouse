@@ -7,8 +7,8 @@ using UnityEngine.XR;
 namespace RobotWarehouse.XR
 {
     /// <summary>
-    /// XR Origin을 씬에 놓아 둔 고정 위치·방향에 의존하지 않게 한다.
-    /// 헤드셋 추적이 잡히면 사용자의 '실제 머리 위치·시선'을 기준으로 XR Origin을 옮기고 돌려,
+    /// XR Origin을 씬에 놓아 둔 고정 위치, 방향에 의존하지 않게 한다.
+    /// 헤드셋 추적이 잡히면 사용자의 '실제 머리 위치, 시선'을 기준으로 XR Origin을 옮기고 돌려,
     /// 사용자가 테이블 앞 standDistance 거리에서 테이블을 정면으로 보게 맞춘다.
     /// Quest 재중심(Oculus 버튼 길게) 때도 다시 맞춘다.
     /// </summary>
@@ -64,7 +64,7 @@ namespace RobotWarehouse.XR
 
         /// <summary>
         /// 사용자를 target 앞 standDistance 위치로 옮기고 target을 바라보게 한다.
-        /// approachFrom: 사용자가 설 방향(테이블 중심 → 사용자, 수평). 0이면 현재 사용자 쪽.
+        /// approachFrom: 사용자가 설 방향(테이블 중심 -> 사용자, 수평). 0이면 현재 사용자 쪽.
         /// </summary>
         public static bool Align(XROrigin origin, Vector3 target, float standDistance, Vector3 approachFrom = default)
         {

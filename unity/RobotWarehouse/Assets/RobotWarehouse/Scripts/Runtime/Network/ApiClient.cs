@@ -42,7 +42,7 @@ namespace RobotWarehouse.Network
     }
 
     /// <summary>
-    /// VR → 서버 REST 클라이언트 (IR-01). UnityWebRequest 코루틴 기반.
+    /// VR -> 서버 REST 클라이언트 (IR-01). UnityWebRequest 코루틴 기반.
     /// 호출하는 쪽 MonoBehaviour가 StartCoroutine으로 실행한다.
     /// </summary>
     public class ApiClient
@@ -84,7 +84,7 @@ namespace RobotWarehouse.Network
         {
             var form = new WWWForm();
             form.AddField("session_id", sessionId);
-            // stt_only: 인식 결과만 받고 창고 생성은 사용자 확인 뒤 /map/text·/map/answer 로 따로 요청 (사용자 UI 설계 10장)
+            // stt_only: 인식 결과만 받고 창고 생성은 사용자 확인 뒤 /map/text, /map/answer 로 따로 요청 (사용자 UI 설계 10장)
             if (sttOnly) form.AddField("stt_only", "true");
             // 음성 답변(SC-03)일 때는 question_id를 함께 보낸다 (docs/api.md 확정 시 맞출 것)
             if (!string.IsNullOrEmpty(questionId)) form.AddField("question_id", questionId);
@@ -98,17 +98,20 @@ namespace RobotWarehouse.Network
             }
         }
 
-        public IEnumerator GetAudioClip(string url, Action<AudioClip> done)
+        /// <summary>음성 + 임의 폼 필드 (시나리오 음성: map_version, robots, inbound, outbound, spec_b_pct).</summary>
+        public IEnumerator PostAudioForm(string path, System.Collections.Generic.IDictionary<string, string> fields, byte[] wav,
+                                         Action<ApiResult> done)
         {
-            if (!url.StartsWith("http")) url = BaseUrl + url;
-            using (var req = UnityWebRequestMultimedia.GetAudioClip(url, AudioType.UNKNOWN))
+            var form = new WWWForm();
+            foreach (var kv in fields)
+                if (!string.IsNullOrEmpty(kv.Value)) form.AddField(kv.Key, kv.Value);
+            form.AddBinaryData(ApiRoutes.AudioFieldName, wav, "voice.wav", "audio/wav");
+            using (var req = UnityWebRequest.Post(BaseUrl + path, form))
             {
                 req.timeout = TimeoutSec;
+                Debug.Log($"[API] POST {path} (audio {wav.Length} bytes)");
                 yield return req.SendWebRequest();
-                if (req.result == UnityWebRequest.Result.Success)
-                    done?.Invoke(DownloadHandlerAudioClip.GetContent(req));
-                else
-                    done?.Invoke(null);
+                done?.Invoke(ToResult(req));
             }
         }
 

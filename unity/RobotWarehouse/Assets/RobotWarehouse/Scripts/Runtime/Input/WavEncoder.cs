@@ -4,7 +4,7 @@ using System.Text;
 
 namespace RobotWarehouse.InputModule
 {
-    /// <summary>float PCM → 16bit 모노 WAV 바이트 (Whisper STT 업로드용).</summary>
+    /// <summary>float PCM -> 16bit 모노 WAV 바이트 (Whisper STT 업로드용).</summary>
     public static class WavEncoder
     {
         public static byte[] Encode(float[] samples, int sampleRate, int channels = 1)
@@ -23,7 +23,7 @@ namespace RobotWarehouse.InputModule
                 w.Write(sampleRate);
                 w.Write(sampleRate * channels * 2);      // byte rate
                 w.Write((short)(channels * 2));          // block align
-                w.Write((short)16);                      // bits per sample
+                w.Write((short)16);                      // 샘플당 비트 수
                 w.Write(Encoding.ASCII.GetBytes("data"));
                 w.Write(byteCount);
                 foreach (var f in samples)

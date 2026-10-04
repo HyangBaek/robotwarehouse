@@ -6,7 +6,7 @@ namespace RobotWarehouse.UI
     /// <summary>
     /// VR 패널 묶음 (IR-06). 로직은 AppController가 연결한다.
     /// - User: 사용자 작업 패널 한 장 (단계별 화면 S01~S08)
-    /// - Dev: 관리자·디버그 패널 (서버·오프라인 재생·보기 전환·예시 문장·로그, 기본 숨김)
+    /// - Dev: 관리자, 디버그 패널 (서버, 오프라인 재생, 보기 전환, 예시 문장, 로그, 기본 숨김)
     /// </summary>
     public class MainPanels
     {

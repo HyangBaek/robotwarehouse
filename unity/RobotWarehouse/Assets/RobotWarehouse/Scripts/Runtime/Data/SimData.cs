@@ -23,7 +23,7 @@ namespace RobotWarehouse.Data
         [JsonProperty("robots")] public List<RobotState> robots = new List<RobotState>();
     }
 
-    /// <summary>칸별 통과·대기 (DR-03): {x, y, pass, wait}</summary>
+    /// <summary>칸별 통과, 대기 (DR-03): {x, y, pass, wait}</summary>
     [Serializable]
     public class CellStat
     {

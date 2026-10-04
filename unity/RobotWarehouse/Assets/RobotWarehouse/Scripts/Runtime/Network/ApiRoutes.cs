@@ -9,15 +9,20 @@ namespace RobotWarehouse.Network
         public const string Health = "/health";
 
         public const string MapText = "/map/text";          // SC-01
-        public const string MapVoice = "/map/voice";        // SC-02 (multipart: session_id, audio)
+        public const string MapVoice = "/map/voice";        // SC-02 (멀티파트 폼: session_id, audio)
         public const string MapAnswer = "/map/answer";      // SC-03
         public const string MapConfirm = "/map/confirm";    // SC-01
         public const string MapEdit = "/map/edit";          // SC-11
 
         public const string Scenario = "/scenario";         // SC-04
+        public const string ScenarioText = "/scenario/text";    // 시나리오 문장 -> WS scenario
+        public const string ScenarioVoice = "/scenario/voice";  // 시나리오 음성 (multipart: session_id, map_version, audio, robots, inbound, outbound)
         public const string Analyze = "/analyze";           // SC-09
         public const string Compare = "/compare";           // SC-07 (문서에 경로가 없어 가정한 이름)
         public const string ImproveApprove = "/improve/approve"; // SC-10
+        public const string Report = "/report";                 // 최종 리포트 -> WS report
+        public const string Sims = "/sims";                     // 저장된 시뮬레이션 목록 (SQLite)
+        public static string SimLoad(string simId) => $"/sim/{simId}/load";   // 기록 다시 불러오기 -> WS map_ready, sim_ready
 
         public static string SimFrames(string simId, int from, int to) => $"/sim/{simId}/frames?from={from}&to={to}";
         public static string SimStats(string simId) => $"/sim/{simId}/stats";

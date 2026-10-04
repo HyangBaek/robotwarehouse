@@ -5,8 +5,8 @@ using UnityEngine.UI;
 namespace RobotWarehouse.UI
 {
     /// <summary>
-    /// 관리자·개발자 패널 (사용자 패널에서 뺀 기능 모음). 기본은 숨김.
-    /// 왼손 Y 버튼 또는 키보드 F1로 켜고 끈다. 세부 설계(관리자·디버그 UI 설계서)는 다음 단계에서 반영.
+    /// 관리자, 개발자 패널 (사용자 패널에서 뺀 기능 모음). 기본은 숨김.
+    /// 왼손 Y 버튼 또는 키보드 F1로 켜고 끈다. 세부 설계(관리자, 디버그 UI 설계서)는 다음 단계에서 반영.
     /// </summary>
     public class DevPanel
     {

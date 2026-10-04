@@ -14,12 +14,12 @@ using Object = UnityEngine.Object;
 namespace RobotWarehouse.EditorTools
 {
     /// <summary>
-    /// RobotWarehouse > 2. 창고 에셋 적용 (Unity Warehouse → URP)
+    /// RobotWarehouse > 2. 창고 에셋 적용 (Unity Warehouse -> URP)
     ///
     /// 'Unity Warehouse Scene (HDRP)' 에셋은 HDRP 셰이더 그래프를 써서 이 프로젝트(URP)에서는 분홍색으로 보인다.
-    /// 원본은 건드리지 않고, 필요한 프리팹(선반·로봇·상자·파레트)만 URP Lit 머티리얼로 바꾼 사본을 만든다.
-    ///   - 머티리얼: .mat 파일을 직접 읽어 알베도·노멀 텍스처와 색을 URP Lit로 옮김 (HDRP 셰이더가 없어도 동작)
-    ///   - 프리팹: 스크립트·충돌체·조명 제거, 그림자용 평면 제거, 피벗을 바닥 중앙으로 맞춤
+    /// 원본은 건드리지 않고, 필요한 프리팹(선반, 로봇, 상자, 파레트)만 URP Lit 머티리얼로 바꾼 사본을 만든다.
+    ///   - 머티리얼: .mat 파일을 직접 읽어 알베도, 노멀 텍스처와 색을 URP Lit로 옮김 (HDRP 셰이더가 없어도 동작)
+    ///   - 프리팹: 스크립트, 충돌체, 조명 제거, 그림자용 평면 제거, 피벗을 바닥 중앙으로 맞춤
     ///   - 결과: Assets/RobotWarehouse/AssetSkin/ 와 Resources/WarehouseSkin.asset (런타임이 자동 사용)
     /// </summary>
     public static class WarehouseAssetConverter
@@ -209,7 +209,7 @@ namespace RobotWarehouse.EditorTools
                     }
                     if (!anyVisible)
                     {
-                        // 바닥 그림자용 평면 등 → 제거
+                        // 바닥 그림자용 평면 등 -> 제거
                         var mf = r.GetComponent<MeshFilter>();
                         Object.DestroyImmediate(r);
                         if (mf != null) Object.DestroyImmediate(mf);
@@ -275,7 +275,7 @@ namespace RobotWarehouse.EditorTools
             }
         }
 
-        /// <summary>렌더링에 필요한 컴포넌트만 남긴다 (스크립트·충돌체·조명·애니메이터 제거).</summary>
+        /// <summary>렌더링에 필요한 컴포넌트만 남긴다 (스크립트, 충돌체, 조명, 애니메이터 제거).</summary>
         static void StripComponents(GameObject go)
         {
             foreach (var t in go.GetComponentsInChildren<Transform>(true))
@@ -303,7 +303,7 @@ namespace RobotWarehouse.EditorTools
         static readonly string[] AlbedoProps =
             { "_MainTex", "_BaseColorMap", "_BaseMap", "_Albedo", "_AlbedoMap", "_Albedo_Map", "_albedo", "_Base_Map", "_Diffuse", "_Color_Map" };
 
-        /// <summary>HDRP 셰이더 그래프 머티리얼 → URP Lit. .mat 파일 텍스트에서 값을 읽는다.</summary>
+        /// <summary>HDRP 셰이더 그래프 머티리얼 -> URP Lit. .mat 파일 텍스트에서 값을 읽는다.</summary>
         static Material ConvertMaterial(Material src, Shader lit, Dictionary<Material, Material> cache)
         {
             if (cache.TryGetValue(src, out var done)) return done;
@@ -400,7 +400,7 @@ namespace RobotWarehouse.EditorTools
 
         /// <summary>
         /// .mat 파일(YAML)을 직접 읽는다. 셰이더(HDRP)가 이 프로젝트에 없으면 Material API로는
-        /// 텍스처·색을 읽을 수 없기 때문이다.
+        /// 텍스처, 색을 읽을 수 없기 때문이다.
         /// </summary>
         static MatProps ReadMaterialFile(string path)
         {

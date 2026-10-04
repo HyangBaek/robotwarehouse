@@ -3,10 +3,10 @@ using UnityEngine;
 namespace RobotWarehouse.Core
 {
     /// <summary>
-    /// 격자 ↔ Unity 좌표 규칙 (docs/schema.md 와 동일하게 유지).
+    /// 격자 <-> Unity 좌표 규칙 (docs/schema.md 와 동일하게 유지).
     /// - 격자 (x, y)의 칸 중심 = 창고 루트 로컬 좌표 (x * cell, 0, y * cell)
     /// - 격자 +x = Unity +X(동쪽), 격자 +y = Unity +Z(북쪽)
-    /// - 칸 (0,0)의 중심이 로컬 원점. 칸 경계는 중심에서 ±cell/2
+    /// - 칸 (0,0)의 중심이 로컬 원점. 칸 경계는 중심에서 +-cell/2
     /// </summary>
     public static class GridCoord
     {

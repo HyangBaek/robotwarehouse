@@ -3,7 +3,7 @@ using System;
 namespace RobotWarehouse.Core
 {
     /// <summary>
-    /// 서버 주소·세션·재생 상수. 서버 주소는 ServerConfig 에셋(에디터 메뉴 1. 서버 연결)에서 읽는다.
+    /// 서버 주소, 세션, 재생 상수. 서버 주소는 ServerConfig 에셋(에디터 메뉴 1. 서버 연결)에서 읽는다.
     /// </summary>
     public static class AppConfig
     {

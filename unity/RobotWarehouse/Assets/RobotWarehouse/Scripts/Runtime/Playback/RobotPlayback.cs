@@ -8,7 +8,7 @@ namespace RobotWarehouse.Playback
 {
     /// <summary>
     /// 로봇 재생기 (FR-21, FR-22). 경로 계산 없이 서버 프레임을 보간해 보여 주기만 한다 (NFR-02).
-    /// 상태별 색: 이동(파랑) · 적재(주황) · 대기(빨강) · 충전(초록) · 유휴(회색).
+    /// 상태별 색: 이동(파랑), 적재(주황), 대기(빨강), 충전(초록), 유휴(회색).
     /// </summary>
     public class RobotPlayback : MonoBehaviour
     {

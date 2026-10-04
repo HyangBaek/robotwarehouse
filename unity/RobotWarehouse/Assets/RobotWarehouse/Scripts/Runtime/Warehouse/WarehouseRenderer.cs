@@ -6,9 +6,9 @@ using UnityEngine;
 namespace RobotWarehouse.Warehouse
 {
     /// <summary>
-    /// 격자 지도 → 3D 블록 (FR-20).
-    /// 랙은 박스, 벽은 블록, 도크·충전 구역은 바닥 색. 바닥은 격자 크기 텍스처 한 장으로 칠한다.
-    /// 블록은 색별 공유 머티리얼을 써서 SRP Batcher·인스턴싱으로 드로우콜을 줄인다.
+    /// 격자 지도 -> 3D 블록 (FR-20).
+    /// 랙은 박스, 벽은 블록, 도크, 충전 구역은 바닥 색. 바닥은 격자 크기 텍스처 한 장으로 칠한다.
+    /// 블록은 색별 공유 머티리얼을 써서 SRP Batcher, 인스턴싱으로 드로우콜을 줄인다.
     /// </summary>
     public class WarehouseRenderer : MonoBehaviour
     {
@@ -43,7 +43,7 @@ namespace RobotWarehouse.Warehouse
         /// <summary>히트맵 레이어가 쓰는 바닥 위 투명 평면.</summary>
         public Renderer HeatmapQuad { get; private set; }
 
-        /// <summary>false면 3D 에셋 스킨 없이 기본 도형만 쓴다 (테스트·성능 비교용).</summary>
+        /// <summary>false면 3D 에셋 스킨 없이 기본 도형만 쓴다 (테스트, 성능 비교용).</summary>
         public bool useSkin = true;
         public bool Skinned => _skin != null;
         /// <summary>선반 1단 높이 (적재 상자 위치 계산에 사용)</summary>
@@ -81,7 +81,7 @@ namespace RobotWarehouse.Warehouse
 
         /// <summary>
         /// 철제 랙 모델에서 선반대(Beam) 윗면 높이를 전체 높이 대비 비율로 구한다.
-        /// Beam 메시 꼭짓점의 높이를 모아 0.02×높이 이상 떨어진 묶음으로 나누고, 묶음마다 가장 높은 값을 쓴다.
+        /// Beam 메시 꼭짓점의 높이를 모아 0.02x높이 이상 떨어진 묶음으로 나누고, 묶음마다 가장 높은 값을 쓴다.
         /// 메시 Read/Write가 꺼져 있으면 빈 배열 (균등 간격으로 대체).
         /// </summary>
         static float[] BeamTopFractions(WarehouseSkin skin)
@@ -182,7 +182,7 @@ namespace RobotWarehouse.Warehouse
             RepaintFloor();
             var r = CreateFlatQuad("Floor", 0f, _floorTex);
             _floor = r.gameObject;
-            // 랙 편집(SC-11)·포인터 조준용 충돌체
+            // 랙 편집(SC-11), 포인터 조준용 충돌체
             var col = _floor.AddComponent<BoxCollider>();
             col.size = new Vector3(1f, 1f, 0.01f);
         }
@@ -292,7 +292,7 @@ namespace RobotWarehouse.Warehouse
             tag.rackId = rackId;
             tag.cell = new Vector2Int(x, y);
             _rackLevels[tag.cell] = levels;
-            // 선반 모양은 RackVisuals가 그린다. 이 박스는 충돌체(편집·조준)와 오류 강조용으로만 남긴다
+            // 선반 모양은 RackVisuals가 그린다. 이 박스는 충돌체(편집, 조준)와 오류 강조용으로만 남긴다
             go.GetComponent<Renderer>().enabled = false;
             return go;
         }
@@ -324,7 +324,7 @@ namespace RobotWarehouse.Warehouse
                 if (r != null) r.sharedMaterial = on ? _wallGlass : solid;
         }
 
-        // ---------- 3D 에셋 랙 (Unity Warehouse → URP 변환 프리팹) ----------
+        // ---------- 3D 에셋 랙 (Unity Warehouse -> URP 변환 프리팹) ----------
 
         /// <summary>
         /// 세로(격자 y 방향)로 이어진 랙 칸을 한 줄로 묶고, 선반 모델을 줄 길이에 맞춰 이어 붙인다.

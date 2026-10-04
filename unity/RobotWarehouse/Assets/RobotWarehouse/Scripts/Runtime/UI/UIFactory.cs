@@ -8,38 +8,49 @@ namespace RobotWarehouse.UI
 {
     /// <summary>
     /// 코드로 World Space UI를 만든다 (프리팹 없이 씬 하나로 동작).
-    /// 색·버튼 규격은 ui_재료 '사용자 UI 개선 설계' 기준:
-    ///  - 파랑 = 주요 행동, 초록 = 완료·확인, 주황 = 주의, 빨강 = 오류, 회색 = 보조·취소
-    ///  - 버튼 최소 0.25m × 0.12m (캔버스 1px = 1mm → 250 × 120px), 서로 다른 행동 버튼 간격 0.08m
+    /// 화면 톤은 Apple visionOS 창을 모티브로 한다: 유리 패널과 얇은 밝은 테두리, 알약 모양 버튼, Apple 시스템 색.
+    /// 색의 역할과 버튼 규격은 ui_재료 '사용자 UI 개선 설계' 기준:
+    ///  - 파랑 = 주요 행동, 초록 = 완료, 확인, 주황 = 주의, 빨강 = 오류, 회색 = 보조, 취소
+    ///  - 버튼 최소 0.25m x 0.12m (캔버스 1px = 1mm -> 250 x 120px), 서로 다른 행동 버튼 간격 0.08m
     ///  - 패널 모서리 R 0.03m, 반투명 유리 배경
     /// </summary>
     public static class UIFactory
     {
         // ---------------------------------------------------------------- 색 (설계서 HSL 값)
-        public static readonly Color Primary = Hsl(210, 1f, 0.50f);     // 실행
-        public static readonly Color Success = Hsl(120, 1f, 0.35f);     // 완료·확인
-        public static readonly Color Warning = Hsl(30, 1f, 0.50f);      // 다시 확인
-        public static readonly Color Danger = Hsl(0, 0.85f, 0.50f);     // 오류
-        /// <summary>보조·취소. 설계 L=60%는 흰 글자 대비가 낮아 버튼 배경은 L=40%로 둔다.</summary>
-        public static readonly Color Secondary = Hsl(215, 0.08f, 0.40f);
-        public static readonly Color Accent = Hsl(185, 0.9f, 0.38f);    // 켜진 토글 (경로 등)
-        public static readonly Color Highlight = Hsl(50, 0.95f, 0.45f); // 켜진 토글 (히트맵)
+        // 역할별 색은 설계서와 같고, 값은 Apple 시스템 색 (visionOS)
+        public static readonly Color Primary = new Color(0.04f, 0.52f, 1f);       // 실행 (systemBlue)
+        public static readonly Color Success = new Color(0.19f, 0.70f, 0.33f);    // 완료, 확인 (systemGreen, 흰 글자 대비를 위해 조금 진하게)
+        public static readonly Color Warning = new Color(1f, 0.58f, 0f);          // 다시 확인 (systemOrange)
+        public static readonly Color Danger = new Color(1f, 0.27f, 0.23f);        // 오류 (systemRed)
+        /// <summary>보조, 취소. visionOS 유리 버튼 (반투명 흰색)</summary>
+        public static readonly Color Secondary = new Color(1f, 1f, 1f, 0.14f);
+        public static readonly Color Accent = new Color(0.19f, 0.69f, 0.78f);     // 켜진 토글, 경로 (systemTeal)
+        public static readonly Color Highlight = new Color(0.95f, 0.72f, 0f);     // 켜진 토글, 히트맵 (systemYellow 계열)
+        public static readonly Color Info = new Color(0.39f, 0.82f, 1f);          // 안내 글자 (systemCyan)
 
-        public static readonly Color PanelBg = new Color(0.07f, 0.09f, 0.12f, 0.86f);
-        public static readonly Color SectionBg = new Color(1f, 1f, 1f, 0.06f);
-        public static readonly Color DividerColor = new Color(1f, 1f, 1f, 0.16f);
-        public static readonly Color TextMain = new Color(0.96f, 0.97f, 0.98f);
-        public static readonly Color TextDim = new Color(0.70f, 0.74f, 0.80f);
-        public static readonly Color TextMuted = new Color(0.50f, 0.54f, 0.60f);
-        public static readonly Color InputBg = new Color(0.96f, 0.97f, 0.99f);
-        public static readonly Color DisabledBg = new Color(0.30f, 0.32f, 0.35f, 0.55f);
+        // visionOS 유리 재질 (VR에서는 배경 흐림이 없으므로 조금 더 진하게)
+        public static readonly Color PanelBg = new Color(0.16f, 0.17f, 0.20f, 0.82f);
+        public static readonly Color SectionBg = new Color(1f, 1f, 1f, 0.07f);
+        public static readonly Color RimColor = new Color(1f, 1f, 1f, 0.16f);
+        public static readonly Color DividerColor = new Color(1f, 1f, 1f, 0.12f);
+        public static readonly Color TextMain = new Color(1f, 1f, 1f, 0.96f);
+        public static readonly Color TextDim = new Color(1f, 1f, 1f, 0.62f);
+        public static readonly Color TextMuted = new Color(1f, 1f, 1f, 0.40f);
+        public static readonly Color InputBg = new Color(0f, 0f, 0f, 0.28f);
+        public static readonly Color DisabledBg = new Color(1f, 1f, 1f, 0.06f);
+
+        // 리포트, 기록 창에서 쓰는 이름
+        public static Color Green => Success;
+        public static Color Orange => Warning;
+        public static Color Yellow => Highlight;
+        public static Color Cyan => Info;
 
         // 예전 이름 (관리자 패널 등에서 사용)
         public static Color ButtonBg => Primary;
         public static Color ButtonAlt => Secondary;
         public static Color ButtonWarn => Warning;
 
-        // ---------------------------------------------------------------- 글자·버튼 크기 (px = mm)
+        // ---------------------------------------------------------------- 글자, 버튼 크기 (px = mm)
         public const int FontHuge = 48;
         public const int FontLarge = 38;
         public const int FontTitle = 34;
@@ -53,8 +64,9 @@ namespace RobotWarehouse.UI
         public const float ButtonHeight = 96f;
         public const float ButtonMinWidth = 250f;   // 0.25m
         public const float ActionGap = 80f;         // 0.08m
-        public const float PanelRadius = 30f;       // 0.03m
-        public const float ButtonRadius = 18f;
+        public const float PanelRadius = 44f;       // visionOS 창 모서리
+        public const float ButtonRadius = 48f;      // 알약 모양 (버튼 높이의 절반, 낮은 버튼은 자동으로 줄어듦)
+        public const float RadiusPanel = PanelRadius, RadiusCard = 28f, RadiusInput = 20f;
 
         public static Color Hsl(float h, float s, float l)
         {
@@ -79,7 +91,7 @@ namespace RobotWarehouse.UI
         public static Color Darken(Color c, float k) => Color.Lerp(c, Color.black, k);
         public static string Hex(Color c) => "#" + ColorUtility.ToHtmlStringRGB(c);
 
-        // ---------------------------------------------------------------- 둥근 모서리·원 스프라이트 (런타임 생성)
+        // ---------------------------------------------------------------- 둥근 모서리, 원 스프라이트 (런타임 생성)
         const int SpriteSize = 64;
         const int SpriteBorder = 28;
         static Sprite _rounded, _circle, _ring;
@@ -139,7 +151,80 @@ namespace RobotWarehouse.UI
             img.pixelsPerUnitMultiplier = SpriteBorder / Mathf.Max(1f, radius);
         }
 
-        // ---------------------------------------------------------------- 캔버스·레이아웃
+        /// <summary>MakeRounded 와 같고 Image 를 돌려준다 (이어서 색을 지정할 때).</summary>
+        public static Image Round(Image img, float radius)
+        {
+            MakeRounded(img, radius);
+            return img;
+        }
+
+        static Sprite _rim;
+
+        /// <summary>둥근 사각형 테두리(2px) 9-slice. visionOS 창의 밝은 테두리용.</summary>
+        static Sprite RimSprite
+        {
+            get
+            {
+                if (_rim != null) return _rim;
+                int n = SpriteSize;
+                var tex = new Texture2D(n, n, TextureFormat.RGBA32, false)
+                {
+                    name = "RW_UI_Rim", wrapMode = TextureWrapMode.Clamp, filterMode = FilterMode.Bilinear,
+                    hideFlags = HideFlags.DontSave
+                };
+                var px = new Color32[n * n];
+                float half = n * 0.5f, r = SpriteBorder;
+                for (int y = 0; y < n; y++)
+                for (int x = 0; x < n; x++)
+                {
+                    float qx = Mathf.Abs(x + 0.5f - half) - (half - r), qy = Mathf.Abs(y + 0.5f - half) - (half - r);
+                    float d = new Vector2(Mathf.Max(qx, 0f), Mathf.Max(qy, 0f)).magnitude + Mathf.Min(Mathf.Max(qx, qy), 0f) - r;
+                    float a = Mathf.Clamp01(0.5f - d) * Mathf.Clamp01(d + 2.5f);   // 바깥 가장자리에서 2px
+                    px[y * n + x] = new Color32(255, 255, 255, (byte)(a * 255));
+                }
+                tex.SetPixels32(px);
+                tex.Apply(false, true);
+                _rim = Sprite.Create(tex, new Rect(0, 0, n, n), new Vector2(0.5f, 0.5f), 100f, 0, SpriteMeshType.FullRect,
+                    new Vector4(SpriteBorder, SpriteBorder, SpriteBorder, SpriteBorder));
+                _rim.hideFlags = HideFlags.DontSave;
+                return _rim;
+            }
+        }
+
+        /// <summary>visionOS 창의 얇은 밝은 테두리. 레이아웃에서 제외된다.</summary>
+        public static Image AddRim(Transform parent, float radius, Color? color = null)
+        {
+            var go = new GameObject("Rim", typeof(RectTransform));
+            go.transform.SetParent(parent, false);
+            go.transform.SetAsFirstSibling();
+            var img = go.AddComponent<Image>();
+            img.sprite = RimSprite;
+            img.type = Image.Type.Sliced;
+            img.pixelsPerUnitMultiplier = SpriteBorder / Mathf.Max(1f, radius);
+            img.color = color ?? RimColor;
+            img.raycastTarget = false;
+            go.AddComponent<LayoutElement>().ignoreLayout = true;
+            Stretch((RectTransform)go.transform);
+            return img;
+        }
+
+        /// <summary>둥근 유리 카드 (세로 배치). 리포트, 기록 창 공용.</summary>
+        public static RectTransform Card(Transform parent, float radius = RadiusCard, Color? color = null, int pad = 18, float spacing = 10)
+        {
+            var go = new GameObject("Card", typeof(RectTransform));
+            go.transform.SetParent(parent, false);
+            Round(go.AddComponent<Image>(), radius).color = color ?? SectionBg;
+            var layout = go.AddComponent<VerticalLayoutGroup>();
+            layout.padding = new RectOffset(pad + 4, pad + 4, pad, pad);
+            layout.spacing = spacing;
+            layout.childControlHeight = true;
+            layout.childControlWidth = true;
+            layout.childForceExpandHeight = false;
+            layout.childForceExpandWidth = true;
+            return (RectTransform)go.transform;
+        }
+
+        // ---------------------------------------------------------------- 캔버스, 레이아웃
         public static Canvas CreateWorldCanvas(string name, Vector2 sizePx, Transform parent, float metersPerPixel = 0.001f,
             int padding = 24, float spacing = 14f)
         {
@@ -158,6 +243,7 @@ namespace RobotWarehouse.UI
             var bg = go.AddComponent<Image>();
             bg.color = PanelBg;
             MakeRounded(bg, PanelRadius);
+            AddRim(go.transform, PanelRadius);
 
             var layout = go.AddComponent<VerticalLayoutGroup>();
             layout.padding = new RectOffset(padding, padding, padding, padding);
@@ -175,7 +261,7 @@ namespace RobotWarehouse.UI
             go.transform.SetParent(parent, false);
             var img = go.AddComponent<Image>();
             img.color = SectionBg;
-            MakeRounded(img, 16f);
+            MakeRounded(img, RadiusCard);
             var layout = go.AddComponent<VerticalLayoutGroup>();
             layout.padding = new RectOffset(16, 16, 12, 16);
             layout.spacing = 10;
@@ -225,7 +311,7 @@ namespace RobotWarehouse.UI
             return (RectTransform)go.transform;
         }
 
-        /// <summary>남는 공간을 채우는 빈 칸 (가운데 정렬·버튼 벌리기용).</summary>
+        /// <summary>남는 공간을 채우는 빈 칸 (가운데 정렬, 버튼 벌리기용).</summary>
         public static LayoutElement Spacer(Transform parent, float minSize = 0f, float flexible = 1f)
         {
             var go = new GameObject("Spacer", typeof(RectTransform));
@@ -296,7 +382,7 @@ namespace RobotWarehouse.UI
 
         /// <summary>
         /// 버튼. 색은 Image 색이 아니라 ColorBlock으로 지정해 네 상태가 같은 규칙으로 바뀐다.
-        /// width ≤ 0이면 줄 안에서 늘어난다. height 기본 120px(0.12m).
+        /// width <= 0이면 줄 안에서 늘어난다. height 기본 120px(0.12m).
         /// </summary>
         public static Button Button(Transform parent, string label, UnityAction onClick, Color? color = null, float width = -1f,
             float height = ButtonHeight, int fontSize = FontBody)
@@ -365,18 +451,17 @@ namespace RobotWarehouse.UI
             go.transform.SetParent(parent, false);
             var img = go.AddComponent<Image>();
             img.color = InputBg;
-            MakeRounded(img, 14f);
+            MakeRounded(img, RadiusInput);
             var le = go.AddComponent<LayoutElement>();
             le.minHeight = height;
             le.preferredHeight = height;
             le.flexibleWidth = 1;
 
             var anchor = multiline ? TextAnchor.UpperLeft : TextAnchor.MiddleLeft;
-            var text = Label(go.transform, "", fontSize, new Color(0.08f, 0.09f, 0.11f), anchor);
+            var text = Label(go.transform, "", fontSize, TextMain, anchor);
             text.supportRichText = false;
             Stretch(text.rectTransform, 20, 14);
-            var ph = Label(go.transform, placeholder, fontSize, new Color(0.45f, 0.47f, 0.52f), anchor);
-            ph.fontStyle = FontStyle.Italic;
+            var ph = Label(go.transform, placeholder, fontSize, TextMuted, anchor);
             Stretch(ph.rectTransform, 20, 14);
 
             var input = go.AddComponent<InputField>();
@@ -386,6 +471,9 @@ namespace RobotWarehouse.UI
             input.contentType = contentType;
             input.lineType = multiline ? InputField.LineType.MultiLineNewline : InputField.LineType.SingleLine;
             input.shouldHideMobileInput = false;
+            input.customCaretColor = true;
+            input.caretColor = Color.white;
+            input.selectionColor = new Color(Primary.r, Primary.g, Primary.b, 0.45f);
             return input;
         }
 
@@ -410,7 +498,7 @@ namespace RobotWarehouse.UI
             Stretch((RectTransform)fillArea.transform, 0, (height - track) * 0.5f);
             var fill = new GameObject("Fill", typeof(RectTransform)).AddComponent<Image>();
             fill.transform.SetParent(fillArea.transform, false);
-            fill.color = Primary;
+            fill.color = new Color(1f, 1f, 1f, 0.88f);   // visionOS 슬라이더는 흰 채움
             MakeRounded(fill, track * 0.5f);
             Stretch(fill.rectTransform);
 
@@ -443,7 +531,7 @@ namespace RobotWarehouse.UI
             rt.offsetMax = new Vector2(-padX, -padY);
         }
 
-        /// <summary>원 배지 (단계 번호·체크 표시). 글자는 배지 안 가운데.</summary>
+        /// <summary>원 배지 (단계 번호, 체크 표시). 글자는 배지 안 가운데.</summary>
         public static (Image bg, Text text) Badge(Transform parent, float size, string text, Color color, bool ring = false,
             int fontSize = FontSmall)
         {
@@ -465,7 +553,7 @@ namespace RobotWarehouse.UI
         }
 
         /// <summary>
-        /// 라벨 + [-] 큰 숫자·단위 [+]. 가상 키보드 없이 숫자를 바꾸는 VR용 입력 (S03).
+        /// 라벨 + [-] 큰 숫자, 단위 [+]. 가상 키보드 없이 숫자를 바꾸는 VR용 입력 (S03).
         /// </summary>
         public static Stepper Stepper(Transform parent, string label, string unit, int min, int max, int step, int value,
             float height = 104f)

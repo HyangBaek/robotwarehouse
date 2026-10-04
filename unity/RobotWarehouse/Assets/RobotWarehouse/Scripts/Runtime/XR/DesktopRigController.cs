@@ -5,7 +5,7 @@ namespace RobotWarehouse.XR
 {
     /// <summary>
     /// 헤드셋 없이 에디터에서 확인할 때 쓰는 이동 (XR 장치가 켜지면 아무것도 하지 않는다).
-    /// WASD 이동, Q/E 하강·상승, 마우스 오른쪽 버튼 드래그로 둘러보기. UI 클릭은 마우스 왼쪽.
+    /// WASD 이동, Q/E 하강, 상승, 마우스 오른쪽 버튼 드래그로 둘러보기. UI 클릭은 마우스 왼쪽.
     /// </summary>
     public class DesktopRigController : MonoBehaviour
     {

@@ -16,7 +16,7 @@ namespace RobotWarehouse.UI
 
         Image _img;
         Color _normal;
-        public Color heldColor = new Color(0.9f, 0.2f, 0.25f);
+        public Color heldColor = new Color(1f, 0.27f, 0.23f, 1f);   // visionOS 시스템 빨강
 
         void Awake()
         {

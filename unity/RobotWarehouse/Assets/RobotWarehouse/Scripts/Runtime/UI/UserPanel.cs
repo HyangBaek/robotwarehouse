@@ -13,16 +13,16 @@ namespace RobotWarehouse.UI
         ManualInput,    // 직접 입력 (창고 설명 / 질문 답변)
         Recording,      // 음성 입력 중
         SttResult,      // 인식 결과 확인
-        Processing,     // Agent 처리 (창고 생성·검증 / 시뮬레이션 / 분석 진행 상태)
+        Processing,     // Agent 처리 (창고 생성, 검증 / 시뮬레이션 / 분석 진행 상태)
         Confirm,        // S02 창고 확인
-        Question,       // S02-Error 검증 실패 → Agent 질문
+        Question,       // S02-Error 검증 실패 -> Agent 질문
         SimConfig,      // S03 시뮬레이션 설정
         Playback,       // S05 결과 재생
         PathSelect,     // 경로 보기 (로봇 선택)
         Heatmap,        // 히트맵 보기
         Analysis,       // S06 병목 분석
         Approval,       // S07 개선안 승인
-        Comparison      // S08 개선 전·후 비교
+        Comparison      // S08 개선 전, 후 비교
     }
 
     public enum ConnectionView { Connected, Connecting, Reconnecting, Disconnected, Offline }
@@ -30,9 +30,9 @@ namespace RobotWarehouse.UI
     public enum ProcState { Pending, Active, Done, Failed }
 
     /// <summary>
-    /// 사용자 작업 패널 한 장 (World Space, 1.2m × 0.73m, 화면에 따라 높이만 줄어듦).
-    /// 공통 구조: Header(단계 번호·제목 · 진행 단계 · 연결 상태) / Content / Footer(Primary Action).
-    /// 서버 주소·세션·디버그 정보는 넣지 않는다 (관리자 패널 DevPanel).
+    /// 사용자 작업 패널 한 장 (World Space, 1.2m x 0.73m, 화면에 따라 높이만 줄어듦).
+    /// 공통 구조: Header(단계 번호, 제목, 진행 단계, 연결 상태) / Content / Footer(Primary Action).
+    /// 서버 주소, 세션, 디버그 정보는 넣지 않는다 (관리자 패널 DevPanel).
     /// 로직은 AppController가 연결한다.
     /// </summary>
     public class UserPanel
@@ -59,8 +59,13 @@ namespace RobotWarehouse.UI
         readonly Dictionary<UserScreen, float> _heights = new Dictionary<UserScreen, float>();
 
         // S01 창고 만들기
-        public Button SpeakButton, ManualButton;
-        public Text CreateStatus;
+        public Button SpeakButton, ManualButton, HistoryButton;
+        public Text CreateStatus, RequiredInfo;
+
+        /// <summary>디지털 트윈에 필요한 지도 정보 (서버 tools/map_generator.REQUIRED_ITEMS 와 같은 순서). 빠지면 Agent 가 되묻는다.</summary>
+        public const string RequiredInfoGuide =
+            "필요한 정보: 랙 줄 수, 통로 폭, 입하·출하 도크 수, 랙 단 수, 충전 구역, 구역 분할, 일방통행(두 구역일 때)\n" +
+            "빠진 항목은 Agent 가 다시 묻고, \"나머지는 기본값\"이라고 하면 기본값으로 채워요";
 
         // 직접 입력
         public Text ManualPrompt, ManualHint;
@@ -93,13 +98,13 @@ namespace RobotWarehouse.UI
         public readonly List<Button> OptionButtons = new List<Button>();
 
         // S03 시뮬레이션 설정
-        public Stepper Robots, Inbound, Outbound;
+        public Stepper Robots, Inbound, Outbound, SpecB;
         public Text TotalText;
-        public Button RunButton, ConfigRebuildButton;
+        public Button RunButton, ConfigRebuildButton, ScenarioSpeakButton;
 
         // S05 재생
         public Text PlayStatus;
-        public Button PlayButton, RestartButton, PathButton, HeatmapButton, SettingsButton, AnalyzeButton;
+        public Button PlayButton, RestartButton, PathButton, HeatmapButton, SettingsButton, AnalyzeButton, ReportButton;
         public Button[] SpeedButtons;
         public readonly float[] Speeds = { 1f, 2f, 4f };
         public Slider StepSlider;
@@ -187,7 +192,7 @@ namespace RobotWarehouse.UI
             tle.flexibleWidth = 1;
             tle.preferredWidth = 1;
 
-            // 진행 단계 ① → ② → ③ → ④
+            // 진행 단계 1 -> 2 -> 3 -> 4
             var prog = new GameObject("Progress", typeof(RectTransform));
             prog.transform.SetParent(row, false);
             var hl = prog.AddComponent<HorizontalLayoutGroup>();
@@ -258,9 +263,11 @@ namespace RobotWarehouse.UI
             UIFactory.Label(c, "또는 컨트롤러 A 버튼을 누른 채 말해도 돼요",
                 UIFactory.FontSmall, UIFactory.TextDim, TextAnchor.MiddleCenter);
             CreateStatus = UIFactory.Label(c, "", UIFactory.FontSmall, UIFactory.Warning, TextAnchor.MiddleCenter);
+            RequiredInfo = UIFactory.Label(c, RequiredInfoGuide, UIFactory.FontSmall - 2, UIFactory.TextDim, TextAnchor.MiddleCenter);
 
             UIFactory.Spacer(f);
-            ManualButton = UIFactory.Button(f, "직접 입력하기", null, UIFactory.Secondary, 420);
+            ManualButton = UIFactory.Button(f, "직접 입력하기", null, UIFactory.Secondary, 380);
+            HistoryButton = UIFactory.Button(f, "이전 기록", null, UIFactory.Secondary, 300);
             UIFactory.Spacer(f);
         }
 
@@ -270,8 +277,7 @@ namespace RobotWarehouse.UI
             ManualPrompt = UIFactory.Label(c, "창고 조건을 입력하세요.", UIFactory.FontTitle, UIFactory.TextMain);
             ManualPrompt.fontStyle = FontStyle.Bold;
             ManualInput = UIFactory.Input(c, "랙 8줄, 통로 폭 3m, 입하 도크 2개, 출하 도크 1개 …", 180, true);
-            ManualHint = UIFactory.Label(c, "랙 줄 수 · 통로 폭 · 입하/출하 도크 수 · 충전 구역 위치를 적으면 정확해져요",
-                UIFactory.FontSmall, UIFactory.TextDim);
+            ManualHint = UIFactory.Label(c, RequiredInfoGuide, UIFactory.FontSmall, UIFactory.TextDim);
 
             ManualCancel = UIFactory.Button(f, "취소", null, UIFactory.Secondary, 300);
             UIFactory.Spacer(f);
@@ -377,9 +383,14 @@ namespace RobotWarehouse.UI
         void BuildSimConfig()
         {
             var (c, f) = NewScreen(UserScreen.SimConfig, FullHeight);
-            Robots = UIFactory.Stepper(c, "가동 로봇", "대", 1, 16, 1, 4, 88f);
-            Inbound = UIFactory.Stepper(c, "입하 물량", "건", 0, 200, 5, 25, 88f);
-            Outbound = UIFactory.Stepper(c, "출하 물량", "건", 0, 200, 5, 25, 88f);
+            Robots = UIFactory.Stepper(c, "가동 로봇", "대", 1, 16, 1, 4, 80f);
+            Inbound = UIFactory.Stepper(c, "입하 물량", "건", 0, 200, 5, 25, 80f);
+            Outbound = UIFactory.Stepper(c, "출하 물량", "건", 0, 200, 5, 25, 80f);
+            SpecB = UIFactory.Stepper(c, "1200x1000 규격", "%", 0, 100, 10, 0, 80f);   // 제품 규격 (FR-11), 나머지는 1100x1100
+            var voice = UIFactory.Row(c, 72, 16, false);
+            var vh = UIFactory.Label(voice, "말로 설정: \"로봇 6대, 입하 30건, 1200 규격 30%, 실행해줘\"", UIFactory.FontSmall - 2, UIFactory.TextDim);
+            vh.gameObject.AddComponent<LayoutElement>().flexibleWidth = 1;
+            ScenarioSpeakButton = UIFactory.Button(voice, "●  말로 설정", null, UIFactory.Secondary, 300, 72, UIFactory.FontSmall + 2);
             Inbound.OnChanged += _ => UpdateTotal();
             Outbound.OnChanged += _ => UpdateTotal();
 
@@ -402,7 +413,7 @@ namespace RobotWarehouse.UI
         {
             var (c, f) = NewScreen(UserScreen.Playback, 520);
             PlayStatus = UIFactory.Label(c, "", UIFactory.FontSmall + 2, UIFactory.TextDim, TextAnchor.MiddleCenter);
-            // 자주 바뀌는 글자는 하위 캔버스로 분리 → 바뀔 때 패널 전체를 다시 그리지 않음 (Quest 프레임 유지)
+            // 자주 바뀌는 글자는 하위 캔버스로 분리 -> 바뀔 때 패널 전체를 다시 그리지 않음 (Quest 프레임 유지)
             PlayStatus.gameObject.AddComponent<Canvas>();
             UIFactory.SetHeight(PlayStatus, 40);
 
@@ -422,6 +433,7 @@ namespace RobotWarehouse.UI
             HeatmapButton = UIFactory.Button(f, "히트맵", null, UIFactory.Secondary);
             SettingsButton = UIFactory.Button(f, "조건 바꾸기", null, UIFactory.Secondary);
             AnalyzeButton = UIFactory.Button(f, "병목 분석", null, UIFactory.Warning);
+            ReportButton = UIFactory.Button(f, "리포트", null, UIFactory.Primary);
         }
 
         void BuildPathSelect()
@@ -608,7 +620,7 @@ namespace RobotWarehouse.UI
         // ================================================================== 화면 전환
 
         /// <summary>
-        /// 화면을 바꾼다. step = 진행 단계(1 창고 만들기 · 2 창고 확인 · 3 시뮬레이션 · 4 결과 분석).
+        /// 화면을 바꾼다. step = 진행 단계(1 창고 만들기, 2 창고 확인, 3 시뮬레이션, 4 결과 분석).
         /// </summary>
         public void Show(UserScreen screen, int step, string title, Color? titleColor = null)
         {
@@ -700,7 +712,7 @@ namespace RobotWarehouse.UI
             }
         }
 
-        /// <summary>active 이전 항목은 완료, active는 진행 중, 이후는 대기. active ≥ 개수면 모두 완료.</summary>
+        /// <summary>active 이전 항목은 완료, active는 진행 중, 이후는 대기. active >= 개수면 모두 완료.</summary>
         public void SetProcessingIndex(int active, bool failed = false)
         {
             _procActive = active;
@@ -727,7 +739,7 @@ namespace RobotWarehouse.UI
             }
         }
 
-        /// <summary>S02 요약 칩 ("랙  8개" 처럼 이름·값 두 칸씩).</summary>
+        /// <summary>S02 요약 칩 ("랙  8개" 처럼 이름, 값 두 칸씩).</summary>
         public void SetConfirmSummary(IList<(string label, string value)> chips)
         {
             for (int i = ConfirmChips.childCount - 1; i >= 0; i--) UnityEngine.Object.Destroy(ConfirmChips.GetChild(i).gameObject);
@@ -840,7 +852,7 @@ namespace RobotWarehouse.UI
 
         public void SetToggle(Button b, bool on, Color onColor) => UIFactory.SetButtonColor(b, on ? onColor : UIFactory.Secondary);
 
-        // ================================================================== 토스트·애니메이션
+        // ================================================================== 토스트, 애니메이션
 
         public void Toast(string message, ToastKind kind = ToastKind.Info, float seconds = 4f, string actionLabel = null, Action action = null)
         {
@@ -865,7 +877,7 @@ namespace RobotWarehouse.UI
             if (_toast != null) _toast.gameObject.SetActive(false);
         }
 
-        /// <summary>AppController.Update에서 매 프레임 호출 (녹음 표시·진행 표시 깜빡임·토스트 시간).</summary>
+        /// <summary>AppController.Update에서 매 프레임 호출 (녹음 표시, 진행 표시 깜빡임, 토스트 시간).</summary>
         public void Tick(float dt, float recordingSeconds)
         {
             _time += dt;

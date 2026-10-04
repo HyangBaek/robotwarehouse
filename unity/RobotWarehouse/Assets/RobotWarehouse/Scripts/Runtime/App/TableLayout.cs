@@ -3,7 +3,7 @@ using UnityEngine;
 namespace RobotWarehouse.App
 {
     /// <summary>
-    /// 씬의 테이블을 기준으로 미니어처 창고·패널 위치를 계산한다.
+    /// 씬의 테이블을 기준으로 미니어처 창고, 패널 위치를 계산한다.
     /// 테이블을 옮기거나 돌려도 창고는 테이블 윗면에, 패널은 테이블 양옆(사용자 쪽)에 놓인다.
     /// </summary>
     public static class TableLayout
@@ -65,7 +65,7 @@ namespace RobotWarehouse.App
             return best;
         }
 
-        /// <summary>창고 전체(mapW × mapH m)가 테이블 윗면의 margin 비율 안에 들어가는 축척.</summary>
+        /// <summary>창고 전체(mapW x mapH m)가 테이블 윗면의 margin 비율 안에 들어가는 축척.</summary>
         public static float FitScale(Top top, Quaternion mapRot, float mapW, float mapH, float margin)
         {
             bool mapXAlongTableX = Mathf.Abs(Vector3.Dot(mapRot * Vector3.right, top.yaw * Vector3.right)) > 0.5f;
@@ -77,7 +77,7 @@ namespace RobotWarehouse.App
         /// <summary>
         /// 테이블 양옆, 사용자 쪽으로 약간 나온 위치에 패널 두 장 (패널 피벗은 아래 가운데).
         /// 오른쪽 = 사용자 작업 패널(사용자 시점 오른쪽 아래), 왼쪽 = 관리자 패널.
-        /// 패널은 사용자 눈을 향하도록 위아래로도 살짝 기울인다 (최대 20°).
+        /// 패널은 사용자 눈을 향하도록 위아래로도 살짝 기울인다 (최대 20도).
         /// </summary>
         public static void PlacePanels(Top top, Vector3 viewer, float floorY, float panelBottom, float leftWidth, float rightWidth,
             float rightHeight, Transform left, Transform right)

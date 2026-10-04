@@ -4,7 +4,7 @@ using Newtonsoft.Json.Linq;
 namespace RobotWarehouse.Data
 {
     /// <summary>
-    /// WebSocket 메시지 (서버 → VR). 구현 시나리오 5장:
+    /// WebSocket 메시지 (서버 -> VR). 구현 시나리오 5장:
     /// transcript, map_ready, question, sim_ready, compare, analysis, error (+ tts, status 선택).
     /// 필드가 최상위에 있든 "data" 아래에 있든 같은 방식으로 읽는다.
     /// </summary>
@@ -17,12 +17,13 @@ namespace RobotWarehouse.Data
         public const string Compare = "compare";
         public const string Analysis = "analysis";
         public const string Error = "error";
-        public const string Tts = "tts";
         public const string Status = "status";
+        public const string Scenario = "scenario";
+        public const string Report = "report";
 
         public static readonly HashSet<string> KnownTypes = new HashSet<string>
         {
-            Transcript, MapReady, Question, SimReady, Compare, Analysis, Error, Tts, Status
+            Transcript, MapReady, Question, SimReady, Compare, Analysis, Error, Status, Scenario, Report
         };
 
         public string Type { get; private set; }

@@ -8,7 +8,7 @@ using UnityEngine.Android;
 namespace RobotWarehouse.InputModule
 {
     /// <summary>
-    /// 누르고 말하기 녹음 (SC-02). Microphone API → WAV 바이트.
+    /// 누르고 말하기 녹음 (SC-02). Microphone API -> WAV 바이트.
     /// 녹음 상한 15초. 너무 짧거나 조용하면 서버로 보내지 않는다.
     /// </summary>
     public class VoiceRecorder : MonoBehaviour

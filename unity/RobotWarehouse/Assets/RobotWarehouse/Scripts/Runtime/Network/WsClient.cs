@@ -12,7 +12,7 @@ namespace RobotWarehouse.Network
     public enum WsState { Disconnected, Connecting, Connected, Reconnecting }
 
     /// <summary>
-    /// 서버 → VR WebSocket 수신기 (IR-02).
+    /// 서버 -> VR WebSocket 수신기 (IR-02).
     /// 수신은 백그라운드 Task, 이벤트 전달은 Poll()을 부르는 메인 스레드에서 한다.
     /// 연결이 끊기면 ReconnectInterval 간격으로 다시 붙는다 (EX-02).
     /// </summary>

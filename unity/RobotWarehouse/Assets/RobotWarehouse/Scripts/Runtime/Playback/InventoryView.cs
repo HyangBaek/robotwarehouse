@@ -9,8 +9,8 @@ namespace RobotWarehouse.Playback
     /// <summary>
     /// 랙 적재 상자 표시. 서버 프레임의 로봇 작업 상태(load/unload)로 "언제 어느 랙에 놓고 가져갔는지"를 복원해
     /// 재생 시간에 맞춰 선반 위 상자를 보이거나 숨긴다.
-    /// - 랙 옆 통로에서 unload가 끝나면 → 옆 랙 칸에 상자 +1 (입하 보관)
-    /// - 랙 옆 통로에서 load가 끝나면 → 옆 랙 칸에서 상자 -1 (출하 피킹)
+    /// - 랙 옆 통로에서 unload가 끝나면 -> 옆 랙 칸에 상자 +1 (입하 보관)
+    /// - 랙 옆 통로에서 load가 끝나면 -> 옆 랙 칸에서 상자 -1 (출하 피킹)
     /// - 도크에서의 load/unload는 랙 재고와 무관 (로봇 위 상자로만 보임)
     /// 처음 재고는 기록에서 거꾸로 계산한다 (가져가기 전에 있어야 했던 만큼).
     /// 상자는 에셋 대신 일정 규격 정육면체(골판지색)로 그린다.
@@ -43,7 +43,7 @@ namespace RobotWarehouse.Playback
 
         public int EventCount => _events.Count;
 
-        /// <summary>현재 재고 (테스트·디버그용)</summary>
+        /// <summary>현재 재고 (테스트, 디버그용)</summary>
         public int StockAt(Vector2Int cell) => _stock.TryGetValue(cell, out var n) ? n : 0;
 
         public void Clear()
@@ -127,7 +127,7 @@ namespace RobotWarehouse.Playback
             _events.Add(new StockEvent { t = t, cell = rack.Value, delta = put ? 1 : -1 });
         }
 
-        /// <summary>작업 위치 옆 랙 칸 (여러 개면 좌표 순 첫 번째 — 서버와 같은 규칙일 필요는 없고 일관성만 유지)</summary>
+        /// <summary>작업 위치 옆 랙 칸 (여러 개면 좌표 순 첫 번째 - 서버와 같은 규칙일 필요는 없고 일관성만 유지)</summary>
         static Vector2Int? AdjacentRack(Vector2Int p, GridMap map)
         {
             Vector2Int? best = null;

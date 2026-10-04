@@ -3,7 +3,7 @@ using UnityEngine;
 namespace RobotWarehouse.Core
 {
     /// <summary>
-    /// 서버 주소 설정. 에디터 메뉴 RobotWarehouse > 1. 서버 연결 에서 입력·저장한다.
+    /// 서버 주소 설정. 에디터 메뉴 RobotWarehouse > 1. 서버 연결 에서 입력, 저장한다.
     /// Resources에 있어 Quest 빌드에도 그대로 들어가고, 앱은 시작하자마자 이 주소로 자동 연결한다.
     /// </summary>
     [CreateAssetMenu(menuName = "RobotWarehouse/Server Config", fileName = "ServerConfig")]
