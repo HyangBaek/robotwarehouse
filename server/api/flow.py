@@ -1,12 +1,14 @@
-"""Agent 처리 흐름 (SC-01~10). mock_server/server.py 의 흐름을 옮기고 해석·생성·검증·시뮬레이션만 실제 구현으로 바꿈.
+"""Agent 처리 흐름 (SC-01~12).
 
+판단이 들어가는 요청(창고 설명, 답변, 랙 편집, 시뮬레이션 실행, 분석, 개선안 승인)은 LangGraph 그래프(agent/graph.py)로
+진행하고, 판단이 없는 요청(음성 인식, 시나리오 문장 해석, 롤링 재계획, 비교, 리포트, 기록 불러오기)은 여기서 도구를 바로 부른다.
 각 단계마다 WS status {node, message} 를 보낸다. 시연 화면에서 Agent 판단 과정을 보여 주는 장치.
 """
 from __future__ import annotations
 
 import asyncio
+import copy
 import io
-import json
 import logging
 import math
 import struct
@@ -14,19 +16,19 @@ import time
 import wave
 from typing import Any
 
+from agent.graph import build_graph
 from agent.interpreter import Interpreter
+from agent.nodes import SOURCE_LABEL
 from config import settings
-from tools.aggregate import aggregate_logs
-from tools.compare import compare_logs
-from tools.map_generator import fill_defaults, generate_map, summarize
-from tools.map_validator import question_for, validate_map
-from tools.simulation import replan, start_simulation, summary_ko
 from planner import simulate
+from tools.compare import compare_logs
+from tools.map_generator import summarize
+from tools.report import build_report
+from tools.scenario import merge_scenario, recommend_scenario
+from tools.simulation import replan, start_simulation, summary_ko
 from .store import Session, SimEntry, Store
 
 log = logging.getLogger("api.flow")
-
-SOURCE_LABEL = {"llm": "LLM", "regex": "정규식", "regex_fallback": "regex_fallback"}
 
 
 class Flow:
@@ -35,82 +37,44 @@ class Flow:
         self.interpreter = Interpreter(llm)
         self.llm_name = getattr(llm, "model", None) or ("LLM" if llm else None)
         self.node_delay = settings.node_delay_sec if node_delay is None else node_delay
+        self.graph = build_graph()
+        self._locks: dict[str, asyncio.Lock] = {}
 
     async def status(self, s: Session, node: str, message: str):
         await self.store.emit(s, {"type": "status", "node": node, "message": message})
         if self.node_delay:
             await asyncio.sleep(self.node_delay)
 
-    def _node_interpret(self) -> str:
+    def node_interpret(self) -> str:
         return f"지시 해석 ({self.llm_name})" if self.llm_name else "지시 해석"
 
-    async def _report_source(self, s: Session, source: str, reason: str | None, ms: float):
+    async def report_source(self, s: Session, source: str, reason: str | None, ms: float):
         if source == "regex_fallback":
             await self.status(s, "regex_fallback", f"LLM 실패 → 정규식으로 해석 ({reason})")
         log.info("해석 source=%s %.0fms", source, ms)
 
-    # ------------------------------------------------------------------ 지도 (SC-01~03, 11, 12)
-    async def build_map(self, s: Session, req: dict[str, Any], defaults: list[str]):
-        m = generate_map(req)
-        await self.status(s, "격자 지도 생성", f"generate_map → {m['width']}×{m['height']}")
-        result = validate_map(m)
-        codes = [e["code"] for e in result["errors"]]
-        await self.status(s, "지도 검증", "통과" if result["valid"] else f"validate=false {codes}")
-        s.req = req
-        if result["valid"]:
-            s.question_id = s.question_text = None
-            s.question_count = 0
-            version = self.store.add_map(s, m, req)
-            await self.store.emit(s, {"type": "map_ready", "map_version": version, "map": m,
-                                      "summary": summarize(m), "defaults_applied": defaults})
-            return
-        if s.question_count >= settings.max_questions:
-            s.question_id = s.question_text = None
-            s.question_count = 0
-            await self.store.emit(s, {"type": "error", "code": "QUESTION_LIMIT", "message": "입력을 다시 해 주세요"})
-            return
-        text, cells = question_for(result["errors"])
-        await self.status(s, "수정 질문", f"오류 {codes} → 질문 생성")
-        qid = self.store.new_id("Q")
-        s.question_id, s.question_text = qid, text
-        s.question_count += 1
-        self.store.questions[qid] = s.session_id
-        await self.store.emit(s, {"type": "question", "question_id": qid, "text": text, "error_cells": cells,
-                                  "errors": codes, "map": m})
+    # ------------------------------------------------------------------ LangGraph Agent 실행
+    async def run_graph(self, s: Session, **inp):
+        """한 요청(턴)을 Agent 그래프로 진행한다. 세션마다 한 번에 한 턴만 (체크포인트 충돌 방지)."""
+        lock = self._locks.setdefault(s.session_id, asyncio.Lock())
+        async with lock:
+            try:
+                return await self.graph.ainvoke(
+                    {**inp, "session_id": s.session_id, "trace": []},
+                    {"configurable": {"thread_id": s.session_id, "flow": self}})
+            except Exception as e:
+                log.exception("Agent 그래프 실패: %s", inp.get("intent"))
+                await self.store.emit(s, {"type": "error", "code": "AGENT_ERROR", "message": f"처리 실패: {e}"})
 
     async def handle_text(self, s: Session, text: str):
-        try:
-            t0 = time.perf_counter()
-            await self.status(s, self._node_interpret(), f"\"{text}\" 해석 중")
-            raw, source, reason = await asyncio.to_thread(self.interpreter.extract, text)
-            ms = (time.perf_counter() - t0) * 1000
-            await self._report_source(s, source, reason, ms)
-            req, defaults = fill_defaults(raw)
-            await self.status(s, self._node_interpret(),
-                              f"요구사항 추출 ({SOURCE_LABEL[source]}, {ms / 1000:.1f}초): "
-                              f"{json.dumps(raw, ensure_ascii=False)}")
-            s.question_count = 0
-            await self.build_map(s, req, defaults)
-        except Exception as e:
-            log.exception("handle_text 실패")
-            await self.store.emit(s, {"type": "error", "code": "AGENT_ERROR", "message": f"지도 생성 실패: {e}"})
+        """창고 설명 -> 지시 해석 -> (빠진 정보 질문) -> 지도 생성 -> 검증 -> (수정 질문) -> 지도 전송"""
+        return await self.run_graph(s, intent="compose", text=text)
 
     async def handle_answer(self, s: Session, text: str):
-        try:
-            t0 = time.perf_counter()
-            await self.status(s, self._node_interpret(), f"답변 반영: \"{text}\"")
-            req, source, reason = await asyncio.to_thread(self.interpreter.merge, s.req, s.question_text, text)
-            ms = (time.perf_counter() - t0) * 1000
-            await self._report_source(s, source, reason, ms)
-            await self.status(s, self._node_interpret(),
-                              f"요구사항 수정 ({SOURCE_LABEL[source]}, {ms / 1000:.1f}초): "
-                              f"{json.dumps(req, ensure_ascii=False)}")
-            await self.build_map(s, req, [])
-        except Exception as e:
-            log.exception("handle_answer 실패")
-            await self.store.emit(s, {"type": "error", "code": "AGENT_ERROR", "message": f"답변 반영 실패: {e}"})
+        return await self.run_graph(s, intent="answer", answer=text)
 
-    async def handle_voice(self, s: Session, data: bytes, question_id: str | None):
+    async def handle_voice(self, s: Session, data: bytes, question_id: str | None, on_text=None, stt_only: bool = False):
+        """on_text 가 있으면 인식 문장을 그쪽으로 넘긴다 (시나리오 음성). stt_only 면 인식 결과만 보낸다."""
         await self.status(s, "STT", f"음성 {len(data) // 1024}KB 인식 중")
         if wav_rms(data) < 0.003:
             return await self._stt_empty(s)
@@ -127,8 +91,12 @@ class Flow:
         if not text:
             return await self._stt_empty(s)
         await self.status(s, "STT", f"인식 완료 ({time.perf_counter() - t0:.1f}초)")
-        await self.store.emit(s, {"type": "transcript", "text": text})
-        if question_id and s.question_id == question_id:
+        await self.store.emit(s, {"type": "transcript", "text": text, "stt_only": stt_only})
+        if stt_only:
+            return
+        if on_text is not None:
+            await on_text(text)
+        elif question_id and s.question_id == question_id:
             await self.handle_answer(s, text)
         else:
             await self.handle_text(s, text)
@@ -138,45 +106,47 @@ class Flow:
         await self.store.emit(s, {"type": "error", "code": "STT_EMPTY", "message": "잘 못 들었어요. 다시 말하거나 입력해 주세요"})
 
     async def handle_edit(self, s: Session, base_version: str, moves: list[dict]):
-        import copy
-        m = copy.deepcopy(self.store.maps[base_version].map)
+        """VR 에서 랙을 옮긴 지도 -> 지도 검증 -> 지도 전송 또는 수정 질문 (SC-11)."""
+        base = self.store.get_map(base_version)
+        m = copy.deepcopy(base.map)
         for mv in moves:
             fx, fy = mv["from"]
             tx, ty = mv["to"]
             m["cells"] = [c for c in m["cells"] if (c["x"], c["y"]) not in ((fx, fy), (tx, ty))]
             m["cells"].append({"x": tx, "y": ty, "type": "rack", "rack_id": mv.get("rack_id")})
-        await self.status(s, "지도 검증", "VR 편집 지도 재검증")
-        result = validate_map(m)
-        if result["valid"]:
-            version = self.store.add_map(s, m, self.store.maps[base_version].req)
-            await self.store.emit(s, {"type": "map_ready", "map_version": version, "map": m,
-                                      "summary": "편집 반영: " + summarize(m), "defaults_applied": []})
-        else:
-            text, cells = question_for(result["errors"])
-            qid = self.store.new_id("Q")
-            s.question_id, s.question_text = qid, text
-            self.store.questions[qid] = s.session_id
-            await self.store.emit(s, {"type": "question", "question_id": qid, "text": "옮긴 위치에서 문제가 생겼어요. " + text,
-                                      "error_cells": cells, "map": m})
+        return await self.run_graph(s, intent="edit", map=m, requirements=base.req, map_note="편집 반영: ",
+                                    confirmed=False, missing=[], defaults_applied=[])
+
+    # ------------------------------------------------------------------ 시나리오 음성, 문장 (SC-04)
+    async def handle_scenario_text(self, s: Session, map_version: str, text: str, current: dict | None = None):
+        """'로봇 6대, 입하 30건 실행해줘' -> WS scenario {robots, inbound, outbound, run}. VR 이 값을 반영하고 run 이면 실행."""
+        try:
+            m = self.store.get_map(map_version).map
+            rec = recommend_scenario(m)
+            t0 = time.perf_counter()
+            await self.status(s, "시나리오 해석", f"\"{text}\" 해석 중")
+            got, source, reason = await asyncio.to_thread(self.interpreter.extract_scenario, text)
+            ms = (time.perf_counter() - t0) * 1000
+            await self.report_source(s, source, reason, ms)
+            base = rec if (got.get("use_defaults") or not current) else {**rec, **current}
+            sc = merge_scenario(base, got)
+            changed = [k for k in ("robots", "inbound", "outbound", "spec_b_pct") if k in got]
+            await self.status(s, "시나리오 해석", f"({SOURCE_LABEL[source]}, {ms / 1000:.1f}초) 로봇 {sc['robots']}대, "
+                                                  f"입하 {sc['inbound']}건, 출하 {sc['outbound']}건"
+                                                  + (f", 1200 규격 {sc['spec_b_pct']}%" if sc["spec_b_pct"] else "")
+                                                  + (" → 실행" if got.get("run") else ""))
+            await self.store.emit(s, {"type": "scenario", "map_version": map_version, **sc,
+                                      "run": bool(got.get("run")), "changed": changed, "basis": rec["basis"]})
+        except Exception as e:
+            log.exception("handle_scenario_text 실패")
+            await self.store.emit(s, {"type": "error", "code": "AGENT_ERROR", "message": f"시나리오 해석 실패: {e}"})
 
     # ------------------------------------------------------------------ 시뮬레이션 (SC-04, 07, 08)
     async def run_sim(self, s: Session, map_version: str, scenario: dict[str, Any], strategy: str, sim_id: str):
-        m = self.store.maps[map_version].map
-        await self.status(s, "시뮬레이션 실행", f"planner.simulate(map v{map_version}, 로봇 {scenario['robots']}, "
-                                                f"주문 {scenario['inbound']}/{scenario['outbound']}, {strategy})")
-        t0 = time.perf_counter()
-        sim, res = await asyncio.to_thread(start_simulation, m, {**scenario, "map_version": map_version}, strategy)
-        ms = round((time.perf_counter() - t0) * 1000, 1)
-        if not res["ok"]:
-            return await self._sim_failed(s, res)
-        lg = res["log"]
-        self.store.sims[sim_id] = SimEntry(sim_id, s.session_id, map_version, scenario, strategy, lg, sim)
-        await self.status(s, "로그 분석", f"충돌 0건, 총 {lg['total_steps']} 스텝, 계산 {ms}ms")
-        await self.store.emit(s, {"type": "sim_ready", "sim_id": sim_id, "strategy": strategy,
-                                  "total_steps": lg["total_steps"], "summary": summary_ko(lg)})
-        return sim_id
+        return await self.run_graph(s, intent="simulate", map_version=map_version, scenario=scenario,
+                                    strategy=strategy, sim_id=sim_id)
 
-    async def _sim_failed(self, s: Session, res: dict):
+    async def sim_failed(self, s: Session, res: dict):
         err = res["error"]
         log.error("시뮬레이션 실패 → VR로 보내지 않음: %s", err)
         await self.store.emit(s, {"type": "error", "code": err["code"], "message": err["message"]})
@@ -184,85 +154,79 @@ class Flow:
     async def run_event(self, e: SimEntry, event: dict):
         s = self.store.session(e.session_id)
         await self.status(s, "롤링 재계획", f"t={event['t']} 주문 +{event['add_orders']}, 로봇 {event['robots']}대 → 이후만 재계산")
+        if e.sim is None:                                 # DB 에서 불러온 기록: 같은 입력으로 엔진 상태를 다시 만든다
+            m = self.store.get_map(e.map_version).map
+            sc = {**e.scenario, "map_version": e.map_version, "events": e.events}
+            e.sim, _ = await asyncio.to_thread(start_simulation, m, sc, e.strategy)
         t0 = time.perf_counter()
         res = await asyncio.to_thread(replan, e.sim, event)
         ms = round((time.perf_counter() - t0) * 1000, 1)
         if not res["ok"]:
-            return await self._sim_failed(s, res)
+            return await self.sim_failed(s, res)
         e.log = res["log"]
         e.events.append(event)
+        e.baseline_log = e.report = None                  # 이벤트가 바뀌었으니 비교, 리포트 다시 계산
+        await asyncio.to_thread(self.store.save_sim, e, ms)
         lg = e.log
         await self.status(s, "로그 분석", f"충돌 0건, 총 {lg['total_steps']} 스텝, 재계획 {ms}ms")
         await self.store.emit(s, {"type": "sim_ready", "sim_id": e.sim_id, "strategy": e.strategy,
                                   "total_steps": lg["total_steps"], "summary": summary_ko(lg),
                                   "replan_from": event["t"], "replan_ms": ms})
 
+    async def baseline_for(self, e: SimEntry) -> dict:
+        if e.baseline_log is None:
+            m = self.store.get_map(e.map_version).map
+            sc = {**e.scenario, "map_version": e.map_version, "events": e.events}
+            e.baseline_log = await asyncio.to_thread(simulate, m, sc, "baseline", 42, e.scenario.get("engine_config"))
+        return e.baseline_log
+
     async def run_compare(self, e: SimEntry):
         s = self.store.session(e.session_id)
         await self.status(s, "비교 리포트", "같은 지도·주문으로 기준 전략 실행")
-        m = self.store.maps[e.map_version].map
-        sc = {**e.scenario, "map_version": e.map_version, "events": e.events}
-        base = await asyncio.to_thread(simulate, m, sc, "baseline", 42)
+        base = await self.baseline_for(e)
         await self.store.emit(s, {"type": "compare", **compare_logs(base, e.log)})
 
-    # ------------------------------------------------------------------ 분석·개선 (SC-09, 10)
-    async def run_analyze(self, e: SimEntry):
+    async def report_for(self, e: SimEntry) -> dict:
+        """최종 리포트 (기준 전략 비교 포함). 한 번 계산하면 이벤트 전까지 재사용."""
+        if e.report is None:
+            base = await self.baseline_for(e)
+            entry = self.store.get_map(e.map_version)
+            e.report = await asyncio.to_thread(build_report, e.log, entry.map, e.scenario, base,
+                                               summarize(entry.map), e.sim_id)
+            if self.store.repo is not None:
+                await asyncio.to_thread(self.store.repo.save_report, e.sim_id, e.report)
+        return e.report
+
+    async def load_sim(self, e: SimEntry, s: Session):
+        """저장된 시뮬레이션을 세션에 다시 불러온다: 지도(확정 상태) -> 재생 (기록 보기)."""
+        entry = self.store.get_map(e.map_version)
+        await self.status(s, "기록 불러오기", f"{e.sim_id} (지도 v{e.map_version})")
+        await self.store.emit(s, {"type": "map_ready", "map_version": e.map_version, "map": entry.map, "confirmed": True,
+                                  "summary": "기록: " + summarize(entry.map), "defaults_applied": []})
+        await self.store.emit(s, {"type": "sim_ready", "sim_id": e.sim_id, "strategy": e.strategy,
+                                  "total_steps": e.log["total_steps"], "summary": summary_ko(e.log),
+                                  "scenario": {k: e.scenario.get(k) for k in ("robots", "inbound", "outbound", "spec_b_pct")},
+                                  "history": True})
+
+    async def run_report(self, e: SimEntry):
         s = self.store.session(e.session_id)
-        await self.status(s, "로그 분석", "칸별 대기 집계 → 병목 상위 10칸")
-        result = analyze_log(self.store, e)
-        await self.status(s, "개선안 제안", f"개선안 {len(result['proposals'])}개 (엔진이 적용 가능한 유형만)")
-        await self.store.emit(s, {"type": "analysis", **result})
+        try:
+            await self.status(s, "최종 리포트", "로봇 효율·주문 처리 시간·기준 전략 비교 집계")
+            rep = await self.report_for(e)
+            await self.store.emit(s, {"type": "report", **rep, "html_url": f"/sim/{e.sim_id}/report.html"})
+        except Exception as ex:
+            log.exception("리포트 실패")
+            await self.store.emit(s, {"type": "error", "code": "REPORT_ERROR", "message": f"리포트 생성 실패: {ex}"})
+
+    # ------------------------------------------------------------------ 분석, 개선 (SC-09, 10)
+    async def run_analyze(self, e: SimEntry):
+        """로그 분석(집계 + LLM 설명) -> 개선안 제안(규칙 후보 + LLM 선택) -> WS analysis"""
+        return await self.run_graph(self.store.session(e.session_id), intent="analyze", sim_id=e.sim_id)
 
     async def run_improve(self, e: SimEntry, p: dict, new_sim: str):
-        s = self.store.session(e.session_id)
-        version = e.map_version
-        scenario = dict(e.scenario)
-        if "robots" in p["apply"]:
-            scenario["robots"] = p["apply"]["robots"]
-        if "dock" in p["apply"]:
-            req = dict(self.store.maps[version].req)
-            key = "dock_in" if p["apply"]["dock"] == "dock_in" else "dock_out"
-            req[key] = req.get(key, 1) + 1
-            m = generate_map(req)
-            if not validate_map(m)["valid"]:
-                await self.store.emit(s, {"type": "error", "code": "IMPROVE_INVALID", "message": "개선안 적용 지도가 검증에 실패했습니다"})
-                return
-            version = self.store.add_map(s, m, req, confirmed=True)
-            await self.store.emit(s, {"type": "map_ready", "map_version": version, "map": m, "confirmed": True,
-                                      "summary": "개선안 적용: " + summarize(m), "defaults_applied": []})
-        await self.run_sim(s, version, scenario, e.strategy, new_sim)
-
-
-def analyze_log(store: Store, e: SimEntry) -> dict[str, Any]:
-    """규칙 기반 병목 분석 (mock_server 와 같은 출력). LLM 설명은 동결 이후 과제."""
-    m = store.maps[e.map_version].map
-    agg = aggregate_logs(e.log, m, top_k=10)
-    top = agg["bottlenecks"]
-    proposals = []
-    if not top:
-        return {"bottlenecks": [], "explanation": "대기가 거의 없습니다. 현재 구성으로 충분합니다.", "proposals": []}
-    t0 = top[0]
-    lines = [f"대기가 가장 많은 칸은 ({t0['x']},{t0['y']})로 {t0['wait']}스텝 기다렸습니다.",
-             f"상위 5칸이 전체 대기 {agg['total_wait']}스텝 중 {agg['top5_share_pct']}%를 차지합니다."]
-    near = agg["nearest_dock"]
-    if near and near["dist"] <= 4:
-        kind = "입하" if near["type"] == "dock_in" else "출하"
-        lines.append(f"{kind} 도크 ({near['x']},{near['y']}) 앞에 로봇이 몰려 줄을 서고 있습니다.")
-        proposals.append({"proposal_id": store.new_id("P"), "type": "dock_add", "text": f"{kind} 도크 1개 추가",
-                          "apply": {"dock": near["type"]}})
-    robots = e.scenario["robots"]
-    if robots > 4:
-        proposals.append({"proposal_id": store.new_id("P"), "type": "robot_count",
-                          "text": f"로봇 {robots}대 → {robots - 2}대", "apply": {"robots": robots - 2}})
-    if not proposals:
-        proposals.append({"proposal_id": store.new_id("P"), "type": "dock_add", "text": "출하 도크 1개 추가",
-                          "apply": {"dock": "dock_out"}})
-    for p in proposals:
-        e.proposals[p["proposal_id"]] = p
-        store.proposals[p["proposal_id"]] = e.sim_id
-    return {"bottlenecks": [{"x": c["x"], "y": c["y"], "wait": c["wait"]} for c in top],
-            "explanation": " ".join(lines),
-            "proposals": [{k: v for k, v in p.items() if k != "apply"} for p in proposals]}
+        """개선안 적용 -> (지도 변경 시 검증, 전송) -> 같은 주문으로 재시뮬레이션"""
+        return await self.run_graph(self.store.session(e.session_id), intent="approve", sim_id=e.sim_id,
+                                    proposal_id=p["proposal_id"], new_sim_id=new_sim)
 
 
 def wav_rms(data: bytes) -> float:

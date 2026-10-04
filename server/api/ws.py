@@ -1,4 +1,4 @@
-"""WebSocket 세션 관리: 세션별 연결, 서버 → VR 메시지 전송. VR 계약: /ws/{session_id} (클라이언트가 ID 생성)."""
+"""WebSocket 세션 관리: 세션별 연결, 서버 -> VR 메시지 전송. VR 계약: /ws/{session_id} (클라이언트가 ID 생성)."""
 import uuid
 
 from fastapi import APIRouter, WebSocket, WebSocketDisconnect
@@ -30,5 +30,5 @@ async def ws_session(ws: WebSocket, session_id: str):
 
 @router.websocket("/ws")
 async def ws_endpoint(ws: WebSocket):
-    """ID 를 서버가 발급하는 방식 (테스트·디버그용). 첫 메시지 {"type": "hello", "session_id"}."""
+    """ID 를 서버가 발급하는 방식 (테스트, 디버그용). 첫 메시지 {"type": "hello", "session_id"}."""
     await _serve(ws, uuid.uuid4().hex[:12], hello=True)

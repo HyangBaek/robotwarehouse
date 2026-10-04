@@ -1,4 +1,4 @@
-"""음성 → 텍스트 (FR-02). faster-whisper 로컬 실행. 모델은 서버 시작 시 1회만 로드한다."""
+"""음성 -> 텍스트 (FR-02). faster-whisper 로컬 실행. 모델은 서버 시작 시 1회만 로드한다."""
 import io
 import logging
 import threading
@@ -17,7 +17,7 @@ class STT(Protocol):
 
 
 class WhisperSTT:
-    """faster-whisper. GPU 여유 4GB 이상이면 large-v3-turbo/cuda/float16, 아니면 small·medium/cpu/int8."""
+    """faster-whisper. GPU 여유 4GB 이상이면 large-v3-turbo/cuda/float16, 아니면 small, medium/cpu/int8."""
 
     def __init__(self, model: str = settings.stt_model, device: str = settings.stt_device,
                  compute_type: str = settings.stt_compute_type):

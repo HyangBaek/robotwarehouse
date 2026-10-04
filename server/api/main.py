@@ -9,16 +9,16 @@ from db.repo import Repo
 from .deps import Deps
 from .flow import Flow
 from .store import Store
-from . import ws, routes_map, routes_sim, routes_analysis
+from . import ws, routes_map, routes_sim, routes_analysis, routes_history
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s %(name)s %(message)s")
 log = logging.getLogger("api")
 _DEFAULT = object()
 
 
-def create_app(db_path: str | None = None, llm=_DEFAULT, stt=_DEFAULT, tts=None,
+def create_app(db_path: str | None = None, llm=_DEFAULT, stt=_DEFAULT,
                node_delay: float | None = None, preload_stt: bool = False) -> FastAPI:
-    """llm·stt 를 넘기지 않으면 설정(.env)대로 만든다. None 을 넘기면 끈다 (정규식 해석, 음성 입력 불가)."""
+    """llm, stt 를 넘기지 않으면 설정(.env)대로 만든다. None 을 넘기면 끈다 (정규식 해석, 음성 입력 불가)."""
     if llm is _DEFAULT:
         from services.llm import make_llm
         llm = make_llm()
@@ -36,11 +36,12 @@ def create_app(db_path: str | None = None, llm=_DEFAULT, stt=_DEFAULT, tts=None,
         yield
 
     app = FastAPI(title="RobotWarehouse Agent Server", lifespan=lifespan)
-    store = Store()
+    repo = Repo(str(db_path or settings.db_path))
+    store = Store(repo)
     app.state.tasks = set()
-    app.state.deps = Deps(repo=Repo(str(db_path or settings.db_path)), llm=llm, stt=stt, tts=tts,
+    app.state.deps = Deps(repo=repo, llm=llm, stt=stt,
                           store=store, flow=Flow(store, llm, stt, node_delay))
-    for module in (ws, routes_map, routes_sim, routes_analysis):
+    for module in (ws, routes_map, routes_sim, routes_analysis, routes_history):
         app.include_router(module.router)
 
     @app.get("/health")

@@ -11,8 +11,6 @@ class Deps:
     repo: Any
     llm: Any
     stt: Any
-    tts: Any = None
-    graph: Any = None
     store: Any = None
     flow: Any = None
 

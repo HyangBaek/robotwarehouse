@@ -19,11 +19,12 @@ async def map_text(body: dict, request: Request):
 
 @router.post("/voice")
 async def map_voice(request: Request, session_id: str = Form("default"), audio: UploadFile = File(...),
-                    question_id: str | None = Form(None)):
+                    question_id: str | None = Form(None), stt_only: bool = Form(False)):
+    """stt_only 이면 인식 결과만 보내고 멈춘다. VR 이 사용자 확인을 받은 뒤 /map/text 나 /map/answer 로 다시 보낸다."""
     d = get_deps(request)
     data = await audio.read()
     s = d.store.session(session_id)
-    spawn(request, d.flow.handle_voice(s, data, question_id))
+    spawn(request, d.flow.handle_voice(s, data, question_id, stt_only=stt_only))
     return {"request_id": d.store.new_id("REQ")}
 
 
@@ -45,9 +46,9 @@ async def map_answer(body: dict, request: Request):
 async def map_confirm(body: dict, request: Request):
     d = get_deps(request)
     v = str(body.get("map_version"))
-    if v not in d.store.maps:
+    if d.store.get_map(v) is None:
         return err(404, "UNKNOWN_MAP", f"map_version {v} 없음")
-    d.store.maps[v].confirmed = True
+    d.store.confirm_map(v)
     return {"status": "confirmed", "map_version": v}
 
 
@@ -55,7 +56,7 @@ async def map_confirm(body: dict, request: Request):
 async def map_edit(body: dict, request: Request):
     d = get_deps(request)
     v = str(body.get("map_version"))
-    if v not in d.store.maps:
+    if d.store.get_map(v) is None:
         return err(404, "UNKNOWN_MAP", f"map_version {v} 없음")
     s = d.store.session(body.get("session_id") or d.store.map_owner.get(v))
     spawn(request, d.flow.handle_edit(s, v, body.get("moves", [])))
