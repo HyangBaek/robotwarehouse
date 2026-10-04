@@ -3,10 +3,10 @@ uvicorn[standard]
 python-multipart
 pydantic>=2
 langgraph
-langchain-openai
-openai
 numpy
+scipy               # planner 헝가리안 할당 (없으면 그리디로 대체)
+httpx               # Ollama 호출 + 테스트
+faster-whisper      # STT (STT_PROVIDER=none 이면 불필요)
 python-dotenv
 # test
 pytest
-httpx
