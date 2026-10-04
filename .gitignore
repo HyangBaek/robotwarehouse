@@ -42,3 +42,6 @@ experiments/results/raw/
 
 # Mac OS specific files
 .DS_Store
+# Unity 복구 씬 (크래시 시 자동 생성)
+unity/RobotWarehouse/Assets/_Recovery/
+unity/RobotWarehouse/Assets/_Recovery.meta
