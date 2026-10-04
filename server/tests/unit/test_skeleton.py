@@ -4,7 +4,7 @@ import pytest
 
 MODULES = [
     "config", "schema.grid_map", "schema.scenario", "schema.sim_log", "schema.messages",
-    "services.llm", "services.stt", "services.tts", "db.repo",
+    "services.llm", "services.stt", "db.repo",
     "tools.map_generator", "tools.map_validator", "tools.orders", "tools.simulation",
     "tools.aggregate", "tools.compare", "tools.proposals",
     "planner", "tools.invariants",

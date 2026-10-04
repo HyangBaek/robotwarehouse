@@ -1,4 +1,4 @@
-"""T9: 문장 세트로 요구사항 추출 정답률·지연 측정 (NFR-05). 정규식과 LLM 을 같은 기준으로 비교.
+"""T9: 문장 세트로 요구사항 추출 정답률, 지연 측정 (NFR-05). 정규식과 LLM 을 같은 기준으로 비교.
 
 실행 (server/ 에서):  python -m tests.eval_sentences            # 정규식 + LLM(설정대로)
                       python -m tests.eval_sentences --regex-only

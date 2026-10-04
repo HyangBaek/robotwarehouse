@@ -1,4 +1,4 @@
-"""지시 해석: LLM 응답 정리·검증과 정규식 대체 경로."""
+"""지시 해석: LLM 응답 정리, 검증과 정규식 대체 경로."""
 import pytest
 
 from agent.interpreter import InterpretError, Interpreter, clean

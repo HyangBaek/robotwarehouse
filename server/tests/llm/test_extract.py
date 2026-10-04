@@ -1,4 +1,4 @@
-"""TC-AGT-11·12: 실제 LLM 지도 생성 성공률 (pytest -m llm). Ollama 가 응답하지 않으면 건너뛴다."""
+"""TC-AGT-11, 12: 실제 LLM 지도 생성 성공률 (pytest -m llm). Ollama 가 응답하지 않으면 건너뛴다."""
 import pytest
 
 from agent.interpreter import REQ_SCHEMA, clean

@@ -40,3 +40,32 @@ def test_lns_no_crash_when_all_wait():
     costs = {r: 0 for r in rs}
     for seed in range(20):
         lns_improve(g, rs, list(rs), dict(paths), dict(costs), W, 5, random.Random(seed))
+
+
+def test_pibt_step_never_collides():
+    """PIBT 한 스텝: 무작위 배치, 목표 200회에서 점, 맞교환 충돌 없음, 이웃 칸으로만 이동, 고정 로봇은 제자리."""
+    import random
+    from planner.engine import Grid, find_collisions, pibt_step
+    g = Grid(make_warehouse(n_lines=4, line_len=8, n_in=1, n_out=1, n_charge=8))
+    free = [i for i in range(g.N) if g.ok[i]]
+    for trial in range(200):
+        rng = random.Random(trial)
+        n = rng.randint(2, 25)
+        cells = rng.sample(free, n)
+        rs = {f"R{i}": (cells[i], rng.choice(free) if rng.random() < 0.8 else -1, rng.random() < 0.1) for i in range(n)}
+        nx = pibt_step(g, rs, {r: rng.random() for r in rs}, rng)
+        xy = lambda c: (c % g.W, c // g.W)
+        frames = [{"t": t, "robots": [{"id": r, "x": xy(c)[0], "y": xy(c)[1]} for r, c in cs.items()]}
+                  for t, cs in ((0, {r: v[0] for r, v in rs.items()}), (1, nx))]
+        assert find_collisions(frames) == []
+        assert all(nx[r] == v[0] or nx[r] in g.adj[v[0]] for r, v in rs.items())
+        assert all(nx[r] == v[0] for r, v in rs.items() if v[2])
+
+
+def test_fallback_and_dock_options_keep_invariants(map_w1):
+    sc = {"map_version": "t", "robots": 3, "inbound": 8, "outbound": 8}
+    base = simulate(map_w1, sc, "optimized", seed=3, config={"fallback": "wait"})
+    assert simulate(map_w1, sc, "optimized", seed=3)["frames"] == base["frames"]   # 평소엔 대체 경로 미사용
+    for cfg in ({"dock_limit": 1}, {"dock_limit": 2, "dock_select": "least_loaded"}):
+        log = simulate(map_w1, sc, "optimized", seed=3, config=cfg)
+        assert log["completed"] and check_invariants(log, map_w1) == []

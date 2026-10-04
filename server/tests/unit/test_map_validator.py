@@ -40,7 +40,7 @@ def test_w3_one_way_valid_and_docks_outside_lane():
 
 
 def test_one_way_dead_end_detected():
-    """옛 mapgen 처럼 일방통행을 가운데 통로 전체 높이에 걸면 막다른 길 → UNREACHABLE."""
+    """옛 mapgen 처럼 일방통행을 가운데 통로 전체 높이에 걸면 막다른 길 -> UNREACHABLE."""
     req, _ = fill_defaults({"racks": 6, "zones": 2, "one_way": "N"})
     m = generate_map(req)
     h = m["height"]
