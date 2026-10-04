@@ -3,7 +3,7 @@ import pathlib, sys
 sys.path.insert(0, str(pathlib.Path(__file__).resolve().parents[2]))  # planner/ 의 상위 폴더
 
 import time
-from planner.engine import simulate, compare, Sim, find_collisions
+from planner.engine import simulate, Sim, find_collisions
 from planner.testmap import make_warehouse, W1, W2
 
 M1, M2 = make_warehouse(**W1), make_warehouse(**W2)

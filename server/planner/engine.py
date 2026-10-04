@@ -6,7 +6,7 @@ engine.py - 다중 로봇 경로 계산 엔진 (로봇웨어하우스, 하재윤
   2. 윈도우 우선순위 계획  : 로봇 전체를 W스텝 앞까지 계획 (충돌 0 보장)
   3. LNS 개선             : 일부 로봇 경로를 지우고 다시 계획해 비용을 줄임 (경로 최적화)
   4. 이벤트 기반 롤링 재계획: 작업 단계가 바뀌거나 h스텝이 지나면 전체를 다시 계획
-  5. 체크포인트 재계획     : 주문 추가·로봇 수 변경 시 시점 t 이전 결과는 유지하고 이후만 재계산
+  5. 체크포인트 재계획     : 주문 추가, 로봇 수 변경 시 시점 t 이전 결과는 유지하고 이후만 재계산
 
 공개 함수
   simulate(map_json, scenario, strategy="optimized", seed=42, config=None) -> dict   (DR-03 로그)
@@ -14,7 +14,7 @@ engine.py - 다중 로봇 경로 계산 엔진 (로봇웨어하우스, 하재윤
   find_collisions(frames) -> list                                                    (충돌 검사기)
   Sim.add_event(event) -> dict                                                       (롤링 재계획)
 
-좌표: 격자 (x, y), 인덱스 = y * width + x. 방향은 규칙의 from→to 벡터로 정한다.
+좌표: 격자 (x, y), 인덱스 = y * width + x. 방향은 규칙의 from->to 벡터로 정한다.
 """
 from __future__ import annotations
 
@@ -32,12 +32,13 @@ except ImportError:  # scipy 없으면 그리디 할당으로 대체
 
 INF = 10 ** 6
 PASSABLE = {"aisle", "dock_in", "dock_out", "charge"}
+DEFAULT_SPEC = "pallet_1100x1100"            # 한국 표준 파레트 (KS T-11), 랙 slot_spec 이 없으면 이 규격
 
 DEFAULT_CFG = dict(
     window=24,                # 계획 구간 W (스텝)
     horizon=12,               # 재계획 없이 실행하는 최대 스텝 h (<= window)
     lns_iters=8,              # 계획 1회당 LNS 반복 수 (고정 횟수 -> 재현 가능)
-    service=1,                # 적재·하역에 걸리는 스텝
+    service=1,                # 적재, 하역에 걸리는 스텝
     max_steps=3000,           # 안전 상한
     storage_load_weight=3.0,  # 보관 위치 점수에서 '같은 랙으로 몰림' 벌점 가중치
     fill_ratio=0.5,           # 시작 시 랙 재고 비율 (출하 주문용)
@@ -46,10 +47,30 @@ DEFAULT_CFG = dict(
     order_mode="far_first",   # 우선순위: far_first | near_first
     stall_patience=3,         # (baseline) 이 스텝 이상 막히면 옆걸음
     random_storage=False,     # 실험용: 최적화 전략에서도 무작위 보관 (기여도 분해)
+    fallback="pibt",          # 윈도우 계획이 모두 실패할 때: pibt(한 스텝 PIBT) | wait(전원 대기, 이전 방식)
+    dock_limit=0,             # 실험용: 도크 하나로 동시에 향하는 로봇 상한 (0 = 제한 없음). 넘으면 주문을 다음 스텝까지 보류
+    dock_select="hash",       # 실험용: hash(주문 번호로 고정, 이전 방식) | least_loaded(향하는 로봇이 가장 적은 도크)
 )
 
 
 # --------------------------------------------------------------------------- 격자
+def passing_cells(m: dict) -> set[int]:
+    """rules.passing_allowed 를 칸 번호 집합으로. 두 점씩 묶어 직선 구간으로 본다
+    (요구사항 명세 예시 [[10, 1], [10, 18]] 은 x=10 의 y=1~18 구간). 홀수 개면 마지막 점은 칸 하나."""
+    W = m["width"]
+    pts = [tuple(p) for p in m.get("rules", {}).get("passing_allowed", []) or []]
+    out = set()
+    for k in range(0, len(pts), 2):
+        (x1, y1), (x2, y2) = pts[k], pts[min(k + 1, len(pts) - 1)]
+        if x1 != x2 and y1 != y2:                      # 직선이 아니면 두 점만
+            out |= {y1 * W + x1, y2 * W + x2}
+            continue
+        for y in range(min(y1, y2), max(y1, y2) + 1):
+            for x in range(min(x1, x2), max(x1, x2) + 1):
+                out.add(y * W + x)
+    return out
+
+
 class Grid:
     """격자 지도 JSON(DR-01) -> 이동 그래프."""
 
@@ -72,10 +93,12 @@ class Grid:
         self.charge = [i for i in range(N) if self.type[i] == "charge"]
 
         self.rack_cap = {r["rack_id"]: r.get("capacity", 6) for r in m.get("racks", [])}
+        self.rack_spec = {r["rack_id"]: r.get("slot_spec", DEFAULT_SPEC) for r in m.get("racks", [])}
         self.racks: dict[str, list[int]] = {}
         for i, rid in rack_cell.items():
             self.racks.setdefault(rid, []).append(i)
             self.rack_cap.setdefault(rid, 6)
+            self.rack_spec.setdefault(rid, DEFAULT_SPEC)
 
         # 일방통행: from -> to 벡터 방향만 허용
         self.ow = {}
@@ -85,6 +108,10 @@ class Grid:
             for y in range(min(y1, y2), max(y1, y2) + 1):
                 for x in range(min(x1, x2), max(x1, x2) + 1):
                     self.ow[y * W + x] = d
+        # 엇갈림 가능 구간(FR-17): 일방통행 안에 있어도 양방향 통행을 허용한다
+        self.passing = passing_cells(m)
+        for i in self.passing:
+            self.ow.pop(i, None)
 
         self.adj = [[] for _ in range(N)]
         self.radj = [[] for _ in range(N)]
@@ -162,7 +189,7 @@ class Resv:
 def plan_one(g: Grid, start: int, goal: int, res: Resv, W: int):
     """
     시공간 A*. 반환: (경로[0..W], 비용) 또는 None.
-      goal >= 0 : 이동·대기 모두 비용 1, h = BFS 거리.
+      goal >= 0 : 이동, 대기 모두 비용 1, h = BFS 거리.
                   목표에 도착해 이후 예약이 없으면 종료, 아니면 t == W에서 종료(f = g + h).
       goal <  0 : 유휴. 대기 비용 0, 이동 비용 1 (비켜 주기만 한다).
     """
@@ -283,9 +310,59 @@ def lns_improve(g: Grid, rs: dict, order: list, paths: dict, costs: dict, W: int
     return paths, costs
 
 
+# --------------------------------------------------------------------------- PIBT 한 스텝 (대체 경로)
+def pibt_step(g: Grid, rs: dict, prio: dict, rng: random.Random) -> dict:
+    """
+    PIBT(우선순위 상속 + 백트래킹)로 모든 로봇의 다음 한 칸을 정한다. 반환: {rid: 다음 칸}.
+    rs = {rid: (pos, goal, fixed)}. fixed(적재, 하역 중) 로봇은 제자리. prio 가 큰 로봇이 먼저 고른다.
+    높은 우선순위 로봇이 원하는 칸에 있는 로봇은 우선순위를 물려받아 먼저 비켜 주고,
+    비킬 곳이 없으면 부모가 다음 후보를 고른다. 점 충돌, 맞교환 충돌이 없는 이동만 만든다.
+    """
+    pos = {r: v[0] for r, v in rs.items()}
+    occ = {c: r for r, c in pos.items()}
+    nxt, res = {}, {}
+    for r, (p, _, fixed) in rs.items():
+        if fixed:
+            nxt[r], res[p] = p, r
+    tie = {r: rng.random() for r in rs}
+
+    def cands(a):
+        p, goal, _ = rs[a]
+        opts = list(g.adjw[p])
+        if goal >= 0:
+            h = g.dist(goal)
+            opts.sort(key=lambda c: (h[c], tie[a] if c == p else rng.random()))
+        else:                                  # 유휴: 제자리 우선, 비켜야 하면 아무 데나
+            opts.sort(key=lambda c: (c != p, rng.random()))
+        return opts
+
+    def go(a, parent):
+        for c in cands(a):
+            if c in res:
+                continue
+            if parent is not None and c == pos[parent]:
+                continue                       # 부모와 맞교환 금지
+            b = occ.get(c)
+            if b is not None and b != a and b in nxt and nxt[b] == pos[a]:
+                continue                       # 이미 정해진 로봇과 맞교환 금지
+            res[c], nxt[a] = a, c
+            if b is not None and b != a and b not in nxt:
+                if not go(b, a):               # 자식이 못 비키면 자식이 c에 남음 -> 다음 후보
+                    continue
+            return True
+        nxt[a] = pos[a]
+        res[pos[a]] = a
+        return False
+
+    for a in sorted((r for r in rs if r not in nxt), key=lambda r: (-prio[r], tie[r])):
+        if a not in nxt:
+            go(a, None)
+    return nxt
+
+
 # --------------------------------------------------------------------------- 충돌 검사기
 def find_collisions(frames: list[dict]) -> list[dict]:
-    """같은 칸·같은 스텝, 맞교환 충돌을 전 구간에서 검사한다 (NFR-04)."""
+    """같은 칸, 같은 스텝, 맞교환 충돌을 전 구간에서 검사한다 (NFR-04)."""
     out = []
     prev = {}
     for fr in frames:
@@ -308,18 +385,36 @@ def find_collisions(frames: list[dict]) -> list[dict]:
 
 
 # --------------------------------------------------------------------------- 주문 생성기
-def create_orders(n_in: int, n_out: int, seed: int, span: int, t0: int = 0, start_id: int = 0):
+def create_orders(n_in: int, n_out: int, seed: int, span: int, t0: int = 0, start_id: int = 0,
+                  spec_mix: dict | None = None):
+    """주문 1건 = 파레트 1개 (qty=1). spec_mix = {규격: 비율} 이면 입하, 출하 각각 비율대로 규격을 나눠 붙인다.
+    spec_mix 가 없으면 모두 기본 규격이고, 난수 순서가 바뀌지 않아 이전과 같은 주문이 나온다."""
     rng = random.Random(seed)
     types = ["inbound"] * n_in + ["outbound"] * n_out
     rng.shuffle(types)
     arr = sorted(t0 + rng.randint(0, span) for _ in types)
-    return [dict(order_id=f"O{start_id + i + 1:03d}", type=ty, arrival_t=a)
-            for i, (ty, a) in enumerate(zip(types, arr))]
+    orders = [dict(order_id=f"O{start_id + i + 1:03d}", type=ty, arrival_t=a, spec=DEFAULT_SPEC, qty=1)
+              for i, (ty, a) in enumerate(zip(types, arr))]
+    mix = {k: float(v) for k, v in (spec_mix or {}).items() if float(v) > 0}
+    if mix and set(mix) != {DEFAULT_SPEC}:
+        srng = random.Random(f"{seed}:{t0}:spec")
+        total = sum(mix.values())
+        for ty in ("inbound", "outbound"):
+            idx = [i for i, o in enumerate(orders) if o["type"] == ty]
+            raw = {k: len(idx) * v / total for k, v in sorted(mix.items())}
+            cnt = {k: int(v) for k, v in raw.items()}
+            for k in sorted(raw, key=lambda k: -(raw[k] - cnt[k]))[:len(idx) - sum(cnt.values())]:
+                cnt[k] += 1                            # 최대 나머지 방식으로 개수를 정확히 맞춤
+            labels = [k for k in sorted(cnt) for _ in range(cnt[k])]
+            srng.shuffle(labels)
+            for i, lab in zip(idx, labels):
+                orders[i]["spec"] = lab
+    return orders
 
 
 # --------------------------------------------------------------------------- 시뮬레이터
 class Sim:
-    STATE = ("t", "robots", "pending", "future", "stock", "busy", "olog", "events", "order_seq")
+    STATE = ("t", "robots", "pending", "future", "stock", "busy", "olog", "events", "order_seq", "_elapsed")
 
     def __init__(self, map_json: dict, scenario: dict, strategy: str = "optimized",
                  seed: int = 42, config: dict | None = None):
@@ -332,8 +427,10 @@ class Sim:
         g = self.g
         if not g.dock_in or not g.dock_out:
             raise ValueError("입하·출하 도크가 필요합니다")
+        self.spec_mix = scenario.get("spec_mix")
         orders = scenario.get("orders") or create_orders(
-            scenario.get("inbound", 0), scenario.get("outbound", 0), seed, self.cfg["arrival_span"])
+            scenario.get("inbound", 0), scenario.get("outbound", 0), seed, self.cfg["arrival_span"],
+            spec_mix=self.spec_mix)
         self.t = 0
         self.future = sorted(copy.deepcopy(orders), key=lambda o: (o["arrival_t"], o["order_id"]))
         self.pending: list[dict] = []
@@ -350,8 +447,11 @@ class Sim:
         self.event_log: list[dict] = []
         self._pending_event: dict | None = None
         self._acc_cache: dict = {}
+        self._short = False                                    # 대체 경로(PIBT)를 쓴 계획이면 한 스텝만 실행
+        self._elapsed: dict = {}                               # PIBT 우선순위: 목표에 못 간 채 지난 계획 횟수
+        self._load_cache: dict = {}
 
-    # ----- 상태 저장·복원 (롤링 재계획용)
+    # ----- 상태 저장, 복원 (롤링 재계획용)
     def _save(self):
         s = {k: copy.deepcopy(getattr(self, k)) for k in self.STATE}
         s["nframes"] = len(self.frames)
@@ -406,7 +506,7 @@ class Sim:
             n = ev.get("add_orders", 0)
             if n:
                 new = create_orders((n + 1) // 2, n // 2, self.seed + ev["t"], 0,
-                                    t0=ev["t"], start_id=self.order_seq)
+                                    t0=ev["t"], start_id=self.order_seq, spec_mix=self.spec_mix)
                 self.order_seq += n
                 self.future = sorted(self.future + new, key=lambda o: (o["arrival_t"], o["order_id"]))
             tgt = ev.get("robots")
@@ -440,14 +540,35 @@ class Sim:
             self._acc_cache[key] = best
         return self._acc_cache[key]
 
+    def _dock_load(self):
+        """도크별로 지금 그 도크를 향하는(또는 그 위에서 작업 중인) 로봇 수."""
+        load = {}
+        for r in self.robots:
+            if r["phase"] in ("to_pickup", "load"):
+                c = r["pickup"]
+            elif r["phase"] in ("to_drop", "unload"):
+                c = r["drop"]
+            else:
+                continue
+            if self.g.type[c] in ("dock_in", "dock_out"):
+                load[c] = load.get(c, 0) + 1
+        return load
+
+    def _dock_for(self, o):
+        docks = self.g.dock_in if o["type"] == "inbound" else self.g.dock_out
+        if self.cfg["dock_select"] == "least_loaded" and len(docks) > 1:
+            load = self._load_cache
+            return min(docks, key=lambda d: (load.get(d, 0), zlib.crc32(f"{o['order_id']}:{d}".encode())))
+        return docks[zlib.crc32(o["order_id"].encode()) % len(docks)]
+
     def _choose_storage(self, o):
         g, cfg = self.g, self.cfg
         inbound = o["type"] == "inbound"
-        docks = g.dock_in if inbound else g.dock_out
-        dock = docks[zlib.crc32(o["order_id"].encode()) % len(docks)]
+        dock = self._dock_for(o)
         rng = random.Random(f"{self.seed}:{o['order_id']}")
-        cand = [rid for rid in g.racks
-                if (self.stock[rid] < g.rack_cap[rid] if inbound else self.stock[rid] > 0)]
+        spec = o.get("spec", DEFAULT_SPEC)
+        cand = [rid for rid in g.racks if g.rack_spec[rid] == spec           # 수용 규격이 맞는 랙만 (FR-15)
+                and (self.stock[rid] < g.rack_cap[rid] if inbound else self.stock[rid] > 0)]
         cand = [rid for rid in cand if self._best_access(rid, dock, inbound)[0] < INF]
         if not cand:
             return None
@@ -468,11 +589,25 @@ class Sim:
         if not idle or not self.pending:
             return
         prepared = []
-        for o in list(self.pending[:len(idle)]):
+        limit = self.cfg["dock_limit"]
+        if limit or self.cfg["dock_select"] == "least_loaded":   # 도크 옵션을 켰을 때만 부하 계산
+            self._load_cache = self._dock_load()
+        cands = self.pending if limit else self.pending[:len(idle)]
+        for o in list(cands):
+            if len(prepared) >= len(idle):
+                break
+            if limit:
+                d = self._dock_for(o)
+                if self._load_cache.get(d, 0) >= limit:
+                    continue                                   # 도크가 꽉 참: 주문 보류
             self.pending.remove(o)
             plan = self._choose_storage(o)
+            if plan is not None and limit:
+                dk = plan[0] if o["type"] == "inbound" else plan[1]
+                self._load_cache[dk] = self._load_cache.get(dk, 0) + 1
             if plan is None:
                 self.olog[o["order_id"]] = dict(order_id=o["order_id"], type=o["type"], robot_id=None,
+                                                spec=o.get("spec", DEFAULT_SPEC), qty=o.get("qty", 1),
                                                 arrival_t=o["arrival_t"], assigned_t=None, done_t=None,
                                                 status="rejected")
                 continue
@@ -496,6 +631,7 @@ class Sim:
         for r, o, (pick, drop, rid) in pairs:
             r.update(phase="to_pickup", order=o["order_id"], rack=rid, pickup=pick, drop=drop)
             self.olog[o["order_id"]] = dict(order_id=o["order_id"], type=o["type"], robot_id=r["id"],
+                                            spec=o.get("spec", DEFAULT_SPEC), qty=o.get("qty", 1),
                                             arrival_t=o["arrival_t"], assigned_t=self.t, done_t=None,
                                             status="active")
 
@@ -525,7 +661,7 @@ class Sim:
             return r["drop"]
         if r["phase"] == "idle" and r["pos"] != r["home"]:
             if not r["active"] or self.strategy == "baseline" or self.g.type[r["pos"]] in ("dock_in", "dock_out"):
-                return r["home"]                               # 비활성·도크 위 유휴 로봇은 집으로
+                return r["home"]                               # 비활성, 도크 위 유휴 로봇은 집으로
         return -1
 
     # ----- 한 스텝 실행
@@ -576,6 +712,8 @@ class Sim:
                 goal = -1
             rs[r["id"]] = (r["pos"], goal, r["phase"] in ("load", "unload"))
         stall = {r["id"]: r["stall"] for r in self.robots}
+        for rid, (pos, goal, fixed) in rs.items():
+            self._elapsed[rid] = self._elapsed.get(rid, 0) + 1 if (goal >= 0 and pos != goal and not fixed) else 0
 
         def key(rid):
             pos, goal, _ = rs[rid]
@@ -595,8 +733,16 @@ class Sim:
                 order.insert(0, failed)
             elif attempts <= len(order) + 3:
                 rng.shuffle(order)
-            else:                                              # 안전 장치: 전원 대기 (현재 상태는 충돌 없음)
-                paths = {rid: [v[0]] * (W + 1) for rid, v in rs.items()}
+            else:                                              # 안전 장치
+                if cfg["fallback"] == "pibt":                  # PIBT 한 스텝 이동 후 바로 다시 계획
+                    # 목표에 못 간 시간이 길수록 우선 (유휴 로봇의 귀가 포함). 같으면 먼 로봇 우선
+                    prio = {rid: self._elapsed.get(rid, 0) + (g.dist(v[1])[v[0]] / g.N if v[1] >= 0 else -1)
+                            for rid, v in rs.items()}
+                    step = pibt_step(g, rs, prio, rng)
+                    paths = {rid: [v[0]] + [step[rid]] * W for rid, v in rs.items()}
+                    self._short = True
+                else:                                          # 전원 대기 (현재 상태는 충돌 없음)
+                    paths = {rid: [v[0]] * (W + 1) for rid, v in rs.items()}
                 out = (paths, {rid: 0 for rid in rs})
                 all_wait = True
                 break
@@ -605,7 +751,7 @@ class Sim:
             paths, costs = lns_improve(g, rs, order, paths, costs, W, cfg["lns_iters"], rng)
         dt = time.perf_counter() - t0
         self.replan_log.append(dict(t=self.t, sec=round(dt, 4), robots=len(self.robots),
-                                    retries=attempts))
+                                    retries=attempts, fallback=all_wait))
         if self._pending_event is not None:
             self._pending_event["replan_s"] = round(dt, 4)
             self._pending_event = None
@@ -667,8 +813,9 @@ class Sim:
             if self.strategy == "baseline":
                 self._step(self._baseline_positions())
                 continue
+            self._short = False
             paths = self._plan()
-            for k in range(1, cfg["horizon"] + 1):
+            for k in range(1, (1 if self._short else cfg["horizon"]) + 1):
                 changed = self._step({rid: p[k] for rid, p in paths.items()})
                 if changed or (nxt_ev is not None and self.t >= nxt_ev):
                     break
@@ -693,7 +840,6 @@ class Sim:
 
     # ----- 결과 (DR-03)
     def result(self) -> dict:
-        W = self.g.W
         passes, waits = {}, {}
         prev = {}
         for fr in self.frames:
@@ -722,6 +868,7 @@ class Sim:
                 replans=len(self.replan_log),
                 replan_avg_s=round(sum(x["sec"] for x in self.replan_log) / max(1, len(self.replan_log)), 4),
                 replan_max_s=max((x["sec"] for x in self.replan_log), default=0),
+                fallbacks=sum(1 for x in self.replan_log if x.get("fallback")),
                 events=self.event_log, config=self.cfg))
 
 
@@ -733,7 +880,7 @@ def simulate(map_json: dict, scenario: dict, strategy: str = "optimized", seed: 
 
 
 def compare(map_json: dict, scenario: dict, seed: int = 42, config: dict | None = None) -> dict:
-    """기준 전략과 최적화 전략을 같은 시드·주문으로 실행하고 개선율을 계산한다 (FR-18, FR-28)."""
+    """기준 전략과 최적화 전략을 같은 시드, 주문으로 실행하고 개선율을 계산한다 (FR-18, FR-28)."""
     b = simulate(map_json, scenario, "baseline", seed, config)
     o = simulate(map_json, scenario, "optimized", seed, config)
     imp = lambda a, c: round((a - c) / a * 100, 1) if a else None

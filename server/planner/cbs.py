@@ -1,8 +1,8 @@
 """
 cbs.py - CBS(Conflict-Based Search) 비교용 구현 (로봇웨어하우스, 하재윤 담당)
 
-용도: "우선순위 계획(PP)·PP+LNS의 해 품질이 최적해에 얼마나 가까운가"를 소규모 인스턴스에서 보이는 비교 기준선.
-      엔진(engine.py)의 격자·일방통행·충돌 규칙(점 충돌 + 맞교환)을 그대로 쓴다.
+용도: "우선순위 계획(PP), PP+LNS의 해 품질이 최적해에 얼마나 가까운가"를 소규모 인스턴스에서 보이는 비교 기준선.
+      엔진(engine.py)의 격자, 일방통행, 충돌 규칙(점 충돌 + 맞교환)을 그대로 쓴다.
 
 참고: Sharon, Stern, Felner, Sturtevant (2015). Conflict-Based Search for Optimal Multi-Agent Pathfinding. AI 219.
 
@@ -10,7 +10,7 @@ cbs.py - CBS(Conflict-Based Search) 비교용 구현 (로봇웨어하우스, 하
   low_level   : 제약(점/간선)을 지키는 시공간 A* (단일 로봇)
   solve_cbs   : 상위 탐색. 가장 이른 충돌 -> 두 로봇에 제약을 하나씩 걸어 분기. 비용 합(SOC) 최소 우선
   solve_pp    : 같은 인스턴스를 PP (+LNS)로 푼다 (engine의 plan_window, lns_improve 재사용)
-  benchmark   : 무작위 인스턴스로 CBS 대비 PP·PP+LNS의 품질(SOC 비율)과 시간을 표로 만든다
+  benchmark   : 무작위 인스턴스로 CBS 대비 PP, PP+LNS의 품질(SOC 비율)과 시간을 표로 만든다
 
 가정: 로봇은 목표에 도착하면 그 칸에 계속 머문다 (엔진의 목표 보유 규칙과 같다).
       비용 = 목표에 마지막으로 도착한 스텝. 비용 합(SOC)과 makespan을 함께 기록한다.
@@ -76,7 +76,7 @@ def count_conflicts(paths: dict) -> int:
 
 
 def valid_paths(g: Grid, paths: dict, starts: dict, goals: dict) -> bool:
-    """이동이 그래프 간선인지, 시작·목표가 맞는지 검사."""
+    """이동이 그래프 간선인지, 시작, 목표가 맞는지 검사."""
     for a, p in paths.items():
         if p[0] != starts[a] or p[-1] != goals[a]:
             return False
@@ -207,7 +207,7 @@ def solve_pp(g: Grid, starts: dict, goals: dict, W: int = 120, lns_iters: int = 
                 sec=round(time.perf_counter() - t0, 4))
 
 
-# --------------------------------------------------------------------------- 인스턴스 생성·벤치마크
+# --------------------------------------------------------------------------- 인스턴스 생성, 벤치마크
 def random_instance(g: Grid, n: int, rng: random.Random, pool: list[int] | None = None):
     pool = pool or [i for i in range(g.N) if g.ok[i] and g.type[i] == "aisle"]
     for _ in range(1000):
@@ -221,7 +221,7 @@ def random_instance(g: Grid, n: int, rng: random.Random, pool: list[int] | None 
 def benchmark(map_json: dict, agents=(2, 3, 4, 5, 6), instances: int = 20, seed: int = 0,
               timeout: float = 10.0, lns_iters: int = 50, region: tuple | None = None) -> list[dict]:
     """
-    region=(x0, x1, y0, y1)로 시작·목표 칸을 좁은 구역에 몰아 혼잡을 높일 수 있다.
+    region=(x0, x1, y0, y1)로 시작, 목표 칸을 좁은 구역에 몰아 혼잡을 높일 수 있다.
     품질 비교는 CBS가 최적해를 찾은 인스턴스만 대상으로, 같은 인스턴스끼리 합산해 계산한다.
     soc_ratio = PP의 SOC 합 / CBS의 SOC 합 (1.00이면 최적과 같음)
     """

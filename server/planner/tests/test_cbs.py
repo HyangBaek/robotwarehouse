@@ -2,9 +2,9 @@
 import pathlib, sys
 sys.path.insert(0, str(pathlib.Path(__file__).resolve().parents[2]))  # planner/ 의 상위 폴더
 
-import itertools, random, time
+import random, time
 from planner.engine import Grid, INF
-from planner.cbs import solve_cbs, solve_pp, find_conflict, valid_paths, path_cost, random_instance
+from planner.cbs import solve_cbs, solve_pp, find_conflict, valid_paths, random_instance
 from planner.testmap import make_warehouse, W1
 
 

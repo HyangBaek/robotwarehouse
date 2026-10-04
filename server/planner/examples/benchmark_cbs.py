@@ -1,4 +1,4 @@
-"""python examples/benchmark_cbs.py  -> CBS 대비 PP·PP+LNS 해 품질 비교표 (소규모 인스턴스)"""
+"""python examples/benchmark_cbs.py -> CBS 대비 PP, PP+LNS 해 품질 비교표 (소규모 인스턴스)"""
 import pathlib, sys
 sys.path.insert(0, str(pathlib.Path(__file__).resolve().parents[2]))  # planner/ 의 상위 폴더
 

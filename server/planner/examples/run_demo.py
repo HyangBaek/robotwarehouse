@@ -1,4 +1,4 @@
-"""python run_demo.py  -> S2/S2-H 비교, 롤링 재계획 시간, 로그 JSON 저장"""
+"""python run_demo.py -> S2/S2-H 비교, 롤링 재계획 시간, 로그 JSON 저장"""
 import pathlib, sys
 sys.path.insert(0, str(pathlib.Path(__file__).resolve().parents[2]))  # planner/ 의 상위 폴더
 
