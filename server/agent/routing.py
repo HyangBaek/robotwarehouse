@@ -3,31 +3,31 @@ from config import settings
 from .state import AgentState
 
 
+def route_entry(s: AgentState) -> str:
+    """요청 종류 -> 첫 노드."""
+    return {"compose": "interpret", "answer": "interpret", "edit": "validate", "simulate": "simulate",
+            "analyze": "analyze", "approve": "apply"}[s["intent"]]
+
+
 def route_after_interpret(s: AgentState) -> str:
-    if s.get("requirements") is not None:
-        return "ok"
-    return "retry" if s.get("llm_retry", 0) < settings.max_llm_retry else "ask"
+    return "generate" if s.get("req_full") else "ask"
 
 
 def route_after_validate(s: AgentState) -> str:
-    v = s["validation"]
-    if v["valid"]:
+    if s["validation"]["valid"]:
         return "ok"
-    codes = {e["code"] for e in v["errors"]}
-    if codes == {"SCHEMA_INVALID"} and s.get("llm_retry", 0) < settings.max_llm_retry:
-        return "retry"
-    if s.get("question_count", 0) >= settings.max_questions:
+    if s.get("intent") == "approve":
+        return "fail"                                   # 개선안 적용 지도는 묻지 않고 실패로 끝냄
+    if s.get("intent") != "edit" and s.get("question_count", 0) >= settings.max_questions:
         return "abort"
     return "ask"
 
 
-def route_after_compare(s: AgentState) -> str:
-    return "analyze" if s.get("analyze_requested") else "end"
-
-
-def route_after_approval(s: AgentState) -> str:
-    return "apply" if s.get("approved_proposal") else "end"
+def route_after_emit(s: AgentState) -> str:
+    return "simulate" if s.get("intent") == "approve" else "end"
 
 
 def route_after_apply(s: AgentState) -> str:
-    return "map_changed" if s.get("history", [{}])[-1].get("changed") == "map" else "scenario_changed"
+    if s.get("error"):
+        return "end"
+    return "map_changed" if s.get("changed") == "map" else "scenario_changed"
