@@ -44,10 +44,12 @@ namespace RobotWarehouse.Playback
             {
                 case "move":
                 case "moving":
+                case "move_empty":
                 case "to_pick":
                 case "to_drop": return new Color(0.25f, 0.55f, 1f);
                 case "carry":
                 case "carrying":
+                case "move_loaded":
                 case "loaded":
                 case "load":
                 case "unload":
@@ -126,6 +128,7 @@ namespace RobotWarehouse.Playback
             {
                 case "carry":
                 case "carrying":
+                case "move_loaded":
                 case "loaded":
                 case "unload":
                 case "drop": return true;
