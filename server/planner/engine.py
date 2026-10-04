@@ -252,7 +252,7 @@ def lns_improve(g: Grid, rs: dict, order: list, paths: dict, costs: dict, W: int
         if rng.random() < 0.3:
             group = rng.sample(order, k)
         else:
-            seed = rng.choices(order, weights=[delay[r] + 0.1 for r in order])[0]
+            seed = rng.choices(order, weights=[max(delay[r], 0) + 0.1 for r in order])[0]
             sx, sy = rs[seed][0] % g.W, rs[seed][0] // g.W
             near = sorted(order, key=lambda r: abs(rs[r][0] % g.W - sx) + abs(rs[r][0] // g.W - sy))
             group = near[:k]
@@ -584,7 +584,7 @@ class Sim:
 
         order = sorted((rid for rid, v in rs.items() if not v[2]), key=key)
         rng = random.Random(self.seed * 1000003 + self.t)
-        attempts, out = 0, None
+        attempts, out, all_wait = 0, None, False
         while True:
             out, failed = plan_window(g, rs, order, W)
             if out:
@@ -598,9 +598,10 @@ class Sim:
             else:                                              # 안전 장치: 전원 대기 (현재 상태는 충돌 없음)
                 paths = {rid: [v[0]] * (W + 1) for rid, v in rs.items()}
                 out = (paths, {rid: 0 for rid in rs})
+                all_wait = True
                 break
         paths, costs = out
-        if cfg["lns_iters"] and len(order) > 1:
+        if cfg["lns_iters"] and len(order) > 1 and not all_wait:   # 전원 대기면 개선할 경로가 없음
             paths, costs = lns_improve(g, rs, order, paths, costs, W, cfg["lns_iters"], rng)
         dt = time.perf_counter() - t0
         self.replan_log.append(dict(t=self.t, sec=round(dt, 4), robots=len(self.robots),
