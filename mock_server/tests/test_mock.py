@@ -231,3 +231,18 @@ def test_api_voice_ok(client):  # TC-API-03
         client.post("/map/voice", data={"session_id": "s4"}, files={"audio": ("v.wav", _wav(0.3), "audio/wav")})
         assert recv_until(ws, "transcript")["text"]
         recv_until(ws, "map_ready")
+
+
+def test_api_voice_stt_only(client):  # 사용자 UI: 인식 결과 확인 후 생성
+    with client.websocket_connect("/ws/s5") as ws:
+        client.post("/map/voice", data={"session_id": "s5", "stt_only": "true"},
+                    files={"audio": ("v.wav", _wav(0.3), "audio/wav")})
+        msg = recv_until(ws, "transcript")
+        assert msg["text"] and msg["stt_only"] is True
+
+
+def test_question_has_options(client):
+    with client.websocket_connect("/ws/s6") as ws:
+        client.post("/map/text", json={"session_id": "s6", "text": "랙 10줄을 통로 없이 붙여서 배치해줘"})
+        q = recv_until(ws, "question")
+        assert q["options"] and all("label" in o and "text" in o for o in q["options"])

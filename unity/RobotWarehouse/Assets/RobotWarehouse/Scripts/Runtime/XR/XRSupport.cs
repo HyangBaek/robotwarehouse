@@ -38,5 +38,12 @@ namespace RobotWarehouse.XR
             var d = InputDevices.GetDeviceAtXRNode(XRNode.RightHand);
             return d.isValid && d.TryGetFeatureValue(usage, out var v) && v;
         }
+
+        /// <summary>왼손 컨트롤러 버튼 상태 (X = primaryButton, Y = secondaryButton).</summary>
+        public static bool LeftButton(InputFeatureUsage<bool> usage)
+        {
+            var d = InputDevices.GetDeviceAtXRNode(XRNode.LeftHand);
+            return d.isValid && d.TryGetFeatureValue(usage, out var v) && v;
+        }
     }
 }

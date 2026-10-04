@@ -79,10 +79,13 @@ namespace RobotWarehouse.Network
             }
         }
 
-        public IEnumerator PostAudio(string path, string sessionId, byte[] wav, Action<ApiResult> done, string questionId = null)
+        public IEnumerator PostAudio(string path, string sessionId, byte[] wav, Action<ApiResult> done, string questionId = null,
+            bool sttOnly = false)
         {
             var form = new WWWForm();
             form.AddField("session_id", sessionId);
+            // stt_only: 인식 결과만 받고 창고 생성은 사용자 확인 뒤 /map/text·/map/answer 로 따로 요청 (사용자 UI 설계 10장)
+            if (sttOnly) form.AddField("stt_only", "true");
             // 음성 답변(SC-03)일 때는 question_id를 함께 보낸다 (docs/api.md 확정 시 맞출 것)
             if (!string.IsNullOrEmpty(questionId)) form.AddField("question_id", questionId);
             form.AddBinaryData(ApiRoutes.AudioFieldName, wav, "voice.wav", "audio/wav");

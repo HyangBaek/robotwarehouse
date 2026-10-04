@@ -27,7 +27,7 @@ from fastapi.responses import JSONResponse
 from mock.engine import simulate
 from mock.mapgen import generate_map, summarize
 from mock.parse_text import extract_requirements, fill_defaults, merge_answer
-from mock.validator import validate_map, question_for
+from mock.validator import validate_map, question_for, options_for
 
 log = logging.getLogger("mock")
 logging.basicConfig(level=logging.INFO, format="%(asctime)s %(message)s")
@@ -161,7 +161,7 @@ async def build_map(s: Session, req: dict[str, Any], defaults: list[str], from_a
     s.question_count += 1
     QUESTIONS[qid] = s.session_id
     await emit(s, {"type": "question", "question_id": qid, "text": text, "error_cells": cells,
-                   "errors": codes, "map": m})
+                   "errors": codes, "options": options_for(result["errors"]), "map": m})
 
 
 async def handle_text(s: Session, text: str):
@@ -201,7 +201,7 @@ def wav_rms(data: bytes) -> float:
 
 @app.post("/map/voice")
 async def map_voice(session_id: str = Form("default"), audio: UploadFile = File(...),
-                    question_id: str | None = Form(None)):
+                    question_id: str | None = Form(None), stt_only: bool = Form(False)):
     data = await audio.read()
     s = session(session_id)
 
@@ -212,7 +212,9 @@ async def map_voice(session_id: str = Form("default"), audio: UploadFile = File(
             await emit(s, {"type": "error", "code": "STT_EMPTY", "message": "잘 못 들었어요. 다시 말하거나 입력해 주세요"})
             return
         text = MOCK_STT_ANSWER if question_id else MOCK_STT_TEXT
-        await emit(s, {"type": "transcript", "text": text})
+        await emit(s, {"type": "transcript", "text": text, "stt_only": stt_only})
+        if stt_only:
+            return  # VR이 인식 결과를 사용자에게 확인받은 뒤 /map/text 또는 /map/answer 로 다시 보낸다
         if question_id and s.question_id == question_id:
             await handle_answer(s, text)
         else:
@@ -392,13 +394,16 @@ def analyze_log(e: SimEntry) -> dict[str, Any]:
         kind = "입하" if near[2] == "dock_in" else "출하"
         lines.append(f"{kind} 도크 ({near[0]},{near[1]}) 앞에 로봇이 몰려 줄을 서고 있습니다.")
         proposals.append({"proposal_id": new_id("P"), "type": "dock_add", "text": f"{kind} 도크 1개 추가",
+                          "effects": [f"{kind} 도크 앞 대기 줄 분산", "도크 왕복 거리 감소"],
                           "apply": {"dock": near[2]}})
     robots = e.scenario["robots"]
     if robots > 4:
         proposals.append({"proposal_id": new_id("P"), "type": "robot_count", "text": f"로봇 {robots}대 → {robots - 2}대",
+                          "effects": ["통로 혼잡 완화", "로봇끼리 비켜 가는 대기 감소"],
                           "apply": {"robots": robots - 2}})
     if not proposals:
         proposals.append({"proposal_id": new_id("P"), "type": "dock_add", "text": "출하 도크 1개 추가",
+                          "effects": ["출하 도크 앞 대기 줄 분산"],
                           "apply": {"dock": "dock_out"}})
     for p in proposals:
         e.proposals[p["proposal_id"]] = p

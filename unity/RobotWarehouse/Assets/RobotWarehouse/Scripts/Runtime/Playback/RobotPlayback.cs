@@ -90,6 +90,9 @@ namespace RobotWarehouse.Playback
         public void TogglePlay() { if (Timeline.Playing) Pause(); else Play(); }
         public void SetSpeed(float s) => Timeline.Speed = s;
 
+        /// <summary>경로 보기에서 로봇 하나를 고른다 (null이면 선택 해제).</summary>
+        public void SelectRobot(string id) => SelectedRobot = id;
+
         public void SelectNextRobot(int dir)
         {
             var ids = Timeline.RobotIds;

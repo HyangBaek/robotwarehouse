@@ -74,28 +74,35 @@ namespace RobotWarehouse.App
             return Mathf.Min(availX * margin / Mathf.Max(0.01f, mapW), availZ * margin / Mathf.Max(0.01f, mapH));
         }
 
-        /// <summary>테이블 양옆, 사용자 쪽으로 약간 나온 위치에 패널 두 장. 패널은 사용자를 향한다.</summary>
-        public static void PlacePanels(Top top, Vector3 viewer, float floorY, float panelHeight, float panelWidth,
-            Transform left, Transform right)
+        /// <summary>
+        /// 테이블 양옆, 사용자 쪽으로 약간 나온 위치에 패널 두 장 (패널 피벗은 아래 가운데).
+        /// 오른쪽 = 사용자 작업 패널(사용자 시점 오른쪽 아래), 왼쪽 = 관리자 패널.
+        /// 패널은 사용자 눈을 향하도록 위아래로도 살짝 기울인다 (최대 20°).
+        /// </summary>
+        public static void PlacePanels(Top top, Vector3 viewer, float floorY, float panelBottom, float leftWidth, float rightWidth,
+            float rightHeight, Transform left, Transform right)
         {
             var toUser = Flat(viewer - top.center);
             if (toUser.sqrMagnitude < 1e-4f) toUser = top.yaw * Vector3.back;
             toUser.Normalize();
             var viewRight = Vector3.Cross(Vector3.up, -toUser);   // 사용자가 테이블을 볼 때 오른쪽
             float half = Mathf.Max(top.size.x, top.size.y) * 0.5f;
-            float lateral = half + panelWidth * 0.5f + 0.1f;
-            var basePos = new Vector3(top.center.x, floorY + panelHeight, top.center.z) + toUser * 0.35f;
+            var basePos = new Vector3(top.center.x, floorY + panelBottom, top.center.z) + toUser * 0.45f;
 
-            Place(left, basePos - viewRight * lateral, viewer);
-            Place(right, basePos + viewRight * lateral, viewer);
+            Place(left, basePos - viewRight * (half + leftWidth * 0.5f + 0.08f), viewer, rightHeight);
+            Place(right, basePos + viewRight * (half * 0.85f + rightWidth * 0.5f), viewer, rightHeight);
         }
 
-        static void Place(Transform panel, Vector3 pos, Vector3 viewer)
+        /// <summary>pos = 패널 아래 가운데. 패널 가운데가 사용자 눈을 향하게 돌린다.</summary>
+        public static void Place(Transform panel, Vector3 pos, Vector3 viewer, float panelHeight)
         {
             if (panel == null) return;
             panel.position = pos;
-            var look = Flat(pos - viewer);
-            panel.rotation = Quaternion.LookRotation(look.sqrMagnitude > 1e-4f ? look : Vector3.forward, Vector3.up);
+            var look = pos + Vector3.up * panelHeight * 0.5f - viewer;
+            var flat = Flat(look);
+            if (flat.sqrMagnitude < 1e-4f) flat = Vector3.forward;
+            float pitch = Mathf.Clamp(Mathf.Atan2(-look.y, flat.magnitude) * Mathf.Rad2Deg, 0f, 20f);
+            panel.rotation = Quaternion.LookRotation(flat, Vector3.up) * Quaternion.Euler(pitch, 0f, 0f);
         }
     }
 }

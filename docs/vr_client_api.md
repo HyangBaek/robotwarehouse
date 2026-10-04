@@ -20,7 +20,7 @@
 | 메서드·경로 | VR이 보내는 본문 | VR이 기대하는 응답 | 시나리오 |
 |---|---|---|---|
 | `POST /map/text` | `{session_id, text}` | `{request_id}` / 빈 문장이면 400 | SC-01 |
-| `POST /map/voice` | multipart `session_id`, `audio`(16kHz 16bit mono WAV), 선택 `question_id` | `{request_id}` | SC-02 · 음성 답변은 `question_id` 포함(**가정**) |
+| `POST /map/voice` | multipart `session_id`, `audio`(16kHz 16bit mono WAV), 선택 `question_id`, 선택 `stt_only` | `{request_id}` | SC-02 · 음성 답변은 `question_id` 포함(**가정**). VR은 `stt_only=true`로 보내 인식 결과만 받고, 사용자가 확인한 뒤 `/map/text`·`/map/answer`로 다시 보낸다(**가정**, 사용자 UI 설계 10장). 서버가 무시하고 바로 생성해도 VR은 그대로 진행 |
 | `POST /map/answer` | `{session_id, question_id, text}` | `{request_id}` | SC-03 |
 | `POST /map/confirm` | `{session_id, map_version}` | `{status: "confirmed"}` / 없는 버전 404 | SC-01 |
 | `POST /map/edit` | `{session_id, map_version, moves:[{rack_id, from:[x,y], to:[x,y]}]}` | `{request_id}` → WS `map_ready` 또는 `question` | SC-11 |
@@ -40,14 +40,14 @@
 
 | type | 필드 | VR 동작 |
 |---|---|---|
-| `status` | `{node, message}` | **가정**. Agent 노드 진행을 패널에 한 줄씩 표시 (시연 때 "판단 → 도구 실행"이 보이게) |
-| `transcript` | `{text}` | 인식 문장 표시. 빈 문자열이면 "잘 못 들었어요" (EX-03) |
+| `status` | `{node, message}` | **가정**. 사용자 패널의 진행 체크리스트를 한 칸씩 넘김(노드 이름에 해석·생성·검증·시뮬레이션·로그·개선 같은 낱말이 있으면 그 단계로, 모르면 다음 칸). 문장은 관리자 패널 로그에 표시 |
+| `transcript` | `{text, stt_only?}` | `stt_only: true`면 "입력 내용을 확인하세요" 화면(다시 말하기 / 고쳐 쓰기 / 생성하기). 없으면 생성 진행 화면. 빈 문자열이면 "잘 못 들었어요" (EX-03) |
 | `map_ready` | `{map_version, map, summary, defaults_applied[], confirmed?}` | 3D 창고 생성, 요약·기본값 안내, 확인 버튼 활성. `confirmed: true`면 확인 생략(**가정**, 개선안 승인 지도) |
-| `question` | `{question_id, text, error_cells[[x,y]...], map?}` | 질문 표시, 답변 입력 활성, 문제 칸 빨간색. `map`이 같이 오면 실패 지도를 먼저 그림(**가정**) |
+| `question` | `{question_id, text, error_cells[[x,y]...], options?, map?}` | 검증 실패 화면(질문 + 선택 버튼 + 말해서 답하기/직접 입력), 문제 칸 빨간색. `options`는 `[{label, text}]` 또는 `["2m","3m"]`, 최대 3개, 누르면 `text`를 답변으로 보냄(**가정**). `map`이 같이 오면 실패 지도를 먼저 그림(**가정**) |
 | `sim_ready` | `{sim_id, strategy, total_steps, summary, replan_from?, replan_ms?}` | 로봇 생성, 프레임 200개씩 받으며 재생, 통계 요청. `replan_from`이 있으면 그 스텝 이후만 교체 |
-| `compare` | `{baseline, optimized, improvement_pct}` | 결과 패널에 두 값과 개선율 |
-| `analysis` | `{bottlenecks[{x,y,wait}], explanation, proposals[{proposal_id,type,text}]}` | 병목 마커, 설명, 개선안 버튼, 히트맵 자동 켜기 |
-| `error` | `{code, message}` | 빨간 글씨 표시 |
+| `compare` | `{baseline, optimized, improvement_pct}` | 비교 화면 표(두 객체에 같이 있는 숫자 항목 최대 3개와 변화율) |
+| `analysis` | `{bottlenecks[{x,y,wait}], explanation, proposals[{proposal_id,type,text,effects?}]}` | 병목 분석 화면(가장 큰 병목 위치·대기 횟수, Agent 설명, 개선안 버튼), 3D 병목 마커, 히트맵 자동 켜기. 개선안을 고르면 승인 화면에 `effects`(예상 효과 문장 목록, **가정**)를 보여 주고, 없으면 `type`별 기본 문구 |
+| `error` | `{code, message}` | 패널 위 빨간 알림 + 진행 중이던 화면에서 이전 단계로. `QUESTION_LIMIT`이면 창고 만들기 화면으로 |
 | (모든 메시지) | `audio_url` | 있으면 TTS로 재생 (FR-30, **가정**) |
 
 `total_steps`는 **마지막 프레임의 `t`** 로 해석합니다(프레임은 `t = 0 … total_steps`). 서버가 프레임 수로 보내도 VR이 받은 마지막 `t`로 맞춥니다.

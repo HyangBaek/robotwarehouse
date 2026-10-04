@@ -47,6 +47,8 @@ namespace RobotWarehouse.Data
         [JsonProperty("proposal_id")] public string proposalId;
         [JsonProperty("type")] public string type;
         [JsonProperty("text")] public string text;
+        /// <summary>예상 효과 (선택 항목, 없으면 VR이 type으로 기본 문구를 고른다)</summary>
+        [JsonProperty("effects")] public List<string> effects;
     }
 
     /// <summary>

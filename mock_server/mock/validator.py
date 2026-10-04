@@ -111,3 +111,24 @@ def question_for(errors: list[dict[str, Any]]) -> tuple[str, list[list[int]]]:
         if e["code"] == "UNREACHABLE":
             cells += e["cells"]
     return " ".join(parts), cells
+
+
+# 질문에 바로 누를 수 있는 답 (VR 패널의 큰 선택 버튼). label = 버튼 글자, text = 서버로 보낼 답변
+OPTIONS = {
+    "UNREACHABLE": [{"label": "통로 2m", "text": "통로 폭 2m로 해줘"}, {"label": "통로 3m", "text": "통로 폭 3m로 해줘"}],
+    "NO_DOCK_IN": [{"label": "입하 1개", "text": "입하 도크 1개로 해줘"}, {"label": "입하 2개", "text": "입하 도크 2개로 해줘"}],
+    "NO_DOCK_OUT": [{"label": "출하 1개", "text": "출하 도크 1개로 해줘"}, {"label": "출하 2개", "text": "출하 도크 2개로 해줘"}],
+    "SIZE_EXCEEDED": [{"label": "랙 6줄", "text": "랙 6줄로 줄여줘"}, {"label": "랙 4줄", "text": "랙 4줄로 줄여줘"}],
+}
+
+
+def options_for(errors: list[dict[str, Any]]) -> list[dict[str, str]]:
+    """오류 코드 → 선택 버튼 (최대 3개)."""
+    codes = [e["code"] for e in errors]
+    if "NO_DOCK_IN" in codes and "NO_DOCK_OUT" in codes:
+        return [{"label": "각각 1개", "text": "입하 도크 1개, 출하 도크 1개로 해줘"},
+                {"label": "각각 2개", "text": "입하 도크 2개, 출하 도크 2개로 해줘"}]
+    for c in dict.fromkeys(codes):
+        if c in OPTIONS:
+            return OPTIONS[c]
+    return []
