@@ -5,6 +5,9 @@
   robot_count     로봇 수 조정             시나리오 값 변경
   storage_weight  보관 위치 몰림 벌점 조정  엔진 설정 storage_load_weight 변경
   one_way         병목 통로 일방통행 지정   rules.one_way 추가 후 재검증
+처리 못 한 주문이 있을 때 tools.outcome 이 앞쪽에 넣는 재시뮬레이션 권고
+  map_resize      랙 줄 수, 통로 폭 변경    요구사항 변경 -> 지도 재생성 -> 재검증
+  order_count     입하, 출하 건수 변경      시나리오 값 변경
 """
 from __future__ import annotations
 
@@ -15,7 +18,7 @@ from .map_generator import RACK_LENGTH, generate_map
 from .map_validator import validate_map
 from .scenario import recommend_scenario
 
-PROPOSAL_TYPES = ("dock_add", "robot_count", "storage_weight", "one_way")
+PROPOSAL_TYPES = ("dock_add", "robot_count", "storage_weight", "one_way", "map_resize", "order_count")
 DEFAULT_STORAGE_WEIGHT = 3.0          # 엔진 기본값 (planner DEFAULT_CFG["storage_load_weight"] 와 같음)
 
 
@@ -96,6 +99,16 @@ def apply_proposal(proposal: dict, grid: dict, scenario: dict, req: dict) -> dic
     if t == "one_way":
         g.setdefault("rules", {}).setdefault("one_way", []).append(a["one_way"])
         return {"changed": "map", "grid": g, "scenario": sc, "req": rq}
+    if t == "map_resize":
+        for k in ("racks", "aisle_width"):
+            if k in a:
+                rq[k] = int(a[k])
+        return {"changed": "map", "grid": generate_map(rq), "scenario": sc, "req": rq}
+    if t == "order_count":
+        for k in ("inbound", "outbound"):
+            if k in a:
+                sc[k] = int(a[k])
+        return {"changed": "scenario", "grid": g, "scenario": sc, "req": rq}
     if t == "robot_count":
         sc["robots"] = int(a["robots"])
     else:

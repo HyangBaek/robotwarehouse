@@ -13,9 +13,17 @@ def compare_logs(baseline: dict, optimized: dict) -> dict:
     """같은 지도, 주문으로 돌린 두 로그 -> VR compare 메시지 본문."""
     def row(log):
         m = log["meta"]
-        return {"총 스텝": log["total_steps"], "주문당 평균": m["avg_order_time"], "대기 합계": m["total_waits"]}
-    return {"baseline": row(baseline), "optimized": row(optimized),
-            "improvement_pct": improvement_pct(baseline["total_steps"], optimized["total_steps"])}
+        r = {"총 스텝": log["total_steps"], "주문당 평균": m["avg_order_time"], "대기 합계": m["total_waits"]}
+        if not log.get("completed", True):
+            r["완료 주문"] = f"{m['orders_done']}/{m['orders_total']}"
+        return r
+    both = baseline.get("completed", True) and optimized.get("completed", True)
+    out = {"baseline": row(baseline), "optimized": row(optimized),
+           "improvement_pct": improvement_pct(baseline["total_steps"], optimized["total_steps"]) if both else None}
+    if not both:   # 짧게 끊기거나 일부만 처리한 실행이 좋아 보이는 착시 방지
+        out["note"] = ("비교 불가: 기준 전략이 주문을 다 처리하지 못함" if not baseline.get("completed", True)
+                       else "비교 불가: 우리 전략이 주문을 다 처리하지 못함")
+    return out
 
 
 def compare_strategies(grid: dict, scenario: dict, seed: int = 42) -> dict:

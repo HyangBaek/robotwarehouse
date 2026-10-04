@@ -144,6 +144,7 @@ namespace RobotWarehouse.Warehouse
             _blocksRoot.SetParent(transform, false);
             _markersRoot = new GameObject("Markers").transform;
             _markersRoot.SetParent(transform, false);
+            _markersRoot.gameObject.SetActive(MarkersVisible);
 
             BuildFloor();
             BuildBlocks();
@@ -526,6 +527,15 @@ namespace RobotWarehouse.Warehouse
                 go.transform.localScale = new Vector3(0.35f * CellSize, h * 0.5f, 0.35f * CellSize);
                 go.GetComponent<Renderer>().sharedMaterial = MaterialLibrary.BlockColored(new Color(1f, 0.15f, 0.25f));
             }
+        }
+
+        /// <summary>병목 마커 보이기 (관리자 패널 Debug Overlay)</summary>
+        public bool MarkersVisible { get; private set; } = true;
+
+        public void SetMarkersVisible(bool v)
+        {
+            MarkersVisible = v;
+            if (_markersRoot != null) _markersRoot.gameObject.SetActive(v);
         }
 
         public void ClearMarkers()

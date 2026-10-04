@@ -42,7 +42,7 @@ def render_list(sims: list[dict]) -> str:
     rows = ""
     for s in sims:
         spec = f" · 1200 규격 {s['spec_b_pct']}%" if s.get("spec_b_pct") else ""
-        state = "완료" if s["completed"] else "미완료"
+        state = "완료" if s["completed"] else "일부 처리 못 함"
         rows += (f'<tr><td><b>{escape(s["sim_id"])}</b><div class="dim" style="font-size:12px">{escape(s["created_at"] or "")}</div></td>'
                  f'<td>{escape(s.get("map_summary") or "")}</td>'
                  f'<td>로봇 {s["robots"]}대 · 입하 {s["inbound"]} · 출하 {s["outbound"]}{escape(spec)}</td>'

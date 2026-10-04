@@ -13,6 +13,7 @@ async def _serve(ws: WebSocket, session_id: str, hello: bool):
     s.sockets.append(ws)
     if hello:
         await ws.send_json({"type": "hello", "session_id": session_id})
+    await store.flush(s, ws)                          # 끊긴 동안 보낸 결과 메시지 (EX-02)
     try:
         while True:
             await ws.receive_text()   # 클라이언트 ping 등

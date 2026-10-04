@@ -1,4 +1,8 @@
-"""run_simulation: 경로 엔진(planner) 호출 (B4). 충돌, 미완료면 ok=False -> 결과를 VR로 보내지 않는다."""
+"""run_simulation: 경로 엔진(planner) 호출 (B4).
+
+충돌이면 ok=False -> 결과를 VR로 보내지 않는다 (엔진 버그). 주문을 다 처리하지 못한 결과는 보내고
+tools.outcome 이 원인과 재시뮬레이션 권고를 붙인다 (팀 방침, docs/api.md '처리 못 한 주문').
+"""
 from planner import Sim, normalize_scenario
 from planner import run_simulation as _run
 from planner.service import check_log as _check
@@ -16,8 +20,12 @@ def run_simulation(grid: dict, scenario: dict, orders: list[dict] | None = None,
 
 
 def check_log(log: dict) -> dict:
-    """planner.service.check_log 로 점검. frames 는 복사해 둔다 (재계획이 Sim.frames 를 잘라내므로)."""
-    return _check({**log, "frames": list(log["frames"])})
+    """planner.service.check_log 로 점검하되, 처리 못 한 주문(INCOMPLETE)은 결과를 보낸다.
+    frames 는 복사해 둔다 (재계획이 Sim.frames 를 잘라내므로)."""
+    res = _check({**log, "frames": list(log["frames"])})
+    if not res["ok"] and res["error"]["code"] == "INCOMPLETE":
+        return dict(ok=True, log=res["log"], error=None)
+    return res
 
 
 def start_simulation(grid: dict, scenario: dict, strategy: str = "optimized", seed: int = 42):
@@ -43,5 +51,5 @@ def replan(sim, event: dict) -> dict:
 def summary_ko(log: dict) -> dict:
     """VR 패널 표시용 요약 (mock_server 와 같은 키)."""
     m = log["meta"]
-    return {"총 스텝": log["total_steps"], "완료 주문": m["orders_done"],
+    return {"총 스텝": log["total_steps"], "완료 주문": f"{m['orders_done']}/{m['orders_total']}",
             "주문당 평균": m["avg_order_time"], "대기 합계": m["total_waits"]}

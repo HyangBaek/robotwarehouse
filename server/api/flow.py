@@ -23,6 +23,7 @@ from config import settings
 from planner import simulate
 from tools.compare import compare_logs
 from tools.map_generator import summarize
+from tools.outcome import diagnose, summary_line
 from tools.report import build_report
 from tools.scenario import merge_scenario, recommend_scenario
 from tools.simulation import replan, start_simulation, summary_ko
@@ -105,15 +106,22 @@ class Flow:
         await self.store.emit(s, {"type": "transcript", "text": ""})
         await self.store.emit(s, {"type": "error", "code": "STT_EMPTY", "message": "잘 못 들었어요. 다시 말하거나 입력해 주세요"})
 
+    async def guard(self, s: Session, what: str, coro):
+        """그래프 밖 백그라운드 작업의 예외를 WS error 로 바꾼다. 안 하면 VR 은 결과를 기다리며 멈춘다."""
+        try:
+            return await coro
+        except Exception as e:
+            log.exception("%s 실패", what)
+            await self.store.emit(s, {"type": "error", "code": "AGENT_ERROR", "message": f"{what} 실패: {type(e).__name__}: {e}"})
+
     async def handle_edit(self, s: Session, base_version: str, moves: list[dict]):
         """VR 에서 랙을 옮긴 지도 -> 지도 검증 -> 지도 전송 또는 수정 질문 (SC-11)."""
         base = self.store.get_map(base_version)
-        m = copy.deepcopy(base.map)
-        for mv in moves:
-            fx, fy = mv["from"]
-            tx, ty = mv["to"]
-            m["cells"] = [c for c in m["cells"] if (c["x"], c["y"]) not in ((fx, fy), (tx, ty))]
-            m["cells"].append({"x": tx, "y": ty, "type": "rack", "rack_id": mv.get("rack_id")})
+        try:
+            m = apply_moves(base.map, moves)
+        except (KeyError, TypeError, ValueError) as e:
+            await self.store.emit(s, {"type": "error", "code": "BAD_EDIT", "message": f"랙 이동 형식 오류: {e}"})
+            return
         return await self.run_graph(s, intent="edit", map=m, requirements=base.req, map_note="편집 반영: ",
                                     confirmed=False, missing=[], defaults_applied=[])
 
@@ -146,6 +154,19 @@ class Flow:
         return await self.run_graph(s, intent="simulate", map_version=map_version, scenario=scenario,
                                     strategy=strategy, sim_id=sim_id)
 
+    def diagnose(self, log: dict, scenario: dict, map_version: str) -> dict:
+        """처리 못 한 주문의 원인, 재시뮬레이션 권고 (tools.outcome)."""
+        entry = self.store.get_map(map_version)
+        return diagnose(log, scenario, entry.req if entry else {}, entry.map if entry else None)
+
+    async def outcome_fields(self, s: Session, log: dict, scenario: dict, map_version: str,
+                             announce: bool = True) -> dict:
+        """sim_ready 에 붙일 summary, completed, issues. 처리 못 한 주문이 있으면 status 로 한 줄 알린다."""
+        d = self.diagnose(log, scenario, map_version)
+        if announce and not d["completed"]:
+            await self.status(s, "결과 점검", d["label"])
+        return {"summary": {**summary_ko(log), **summary_line(d)}, "completed": d["completed"], "issues": d["issues"]}
+
     async def sim_failed(self, s: Session, res: dict):
         err = res["error"]
         log.error("시뮬레이션 실패 → VR로 보내지 않음: %s", err)
@@ -153,6 +174,12 @@ class Flow:
 
     async def run_event(self, e: SimEntry, event: dict):
         s = self.store.session(e.session_id)
+        try:
+            await self.guard(s, "롤링 재계획", self._run_event(s, e, event))
+        finally:
+            e.busy = False
+
+    async def _run_event(self, s: Session, e: SimEntry, event: dict):
         await self.status(s, "롤링 재계획", f"t={event['t']} 주문 +{event['add_orders']}, 로봇 {event['robots']}대 → 이후만 재계산")
         if e.sim is None:                                 # DB 에서 불러온 기록: 같은 입력으로 엔진 상태를 다시 만든다
             m = self.store.get_map(e.map_version).map
@@ -170,7 +197,8 @@ class Flow:
         lg = e.log
         await self.status(s, "로그 분석", f"충돌 0건, 총 {lg['total_steps']} 스텝, 재계획 {ms}ms")
         await self.store.emit(s, {"type": "sim_ready", "sim_id": e.sim_id, "strategy": e.strategy,
-                                  "total_steps": lg["total_steps"], "summary": summary_ko(lg),
+                                  "total_steps": lg["total_steps"],
+                                  **await self.outcome_fields(s, lg, e.scenario, e.map_version),
                                   "replan_from": event["t"], "replan_ms": ms})
 
     async def baseline_for(self, e: SimEntry) -> dict:
@@ -182,6 +210,9 @@ class Flow:
 
     async def run_compare(self, e: SimEntry):
         s = self.store.session(e.session_id)
+        await self.guard(s, "비교 리포트", self._run_compare(s, e))
+
+    async def _run_compare(self, s: Session, e: SimEntry):
         await self.status(s, "비교 리포트", "같은 지도·주문으로 기준 전략 실행")
         base = await self.baseline_for(e)
         await self.store.emit(s, {"type": "compare", **compare_logs(base, e.log)})
@@ -204,7 +235,8 @@ class Flow:
         await self.store.emit(s, {"type": "map_ready", "map_version": e.map_version, "map": entry.map, "confirmed": True,
                                   "summary": "기록: " + summarize(entry.map), "defaults_applied": []})
         await self.store.emit(s, {"type": "sim_ready", "sim_id": e.sim_id, "strategy": e.strategy,
-                                  "total_steps": e.log["total_steps"], "summary": summary_ko(e.log),
+                                  "total_steps": e.log["total_steps"],
+                                  **await self.outcome_fields(s, e.log, e.scenario, e.map_version, announce=False),
                                   "scenario": {k: e.scenario.get(k) for k in ("robots", "inbound", "outbound", "spec_b_pct")},
                                   "history": True})
 
@@ -227,6 +259,23 @@ class Flow:
         """개선안 적용 -> (지도 변경 시 검증, 전송) -> 같은 주문으로 재시뮬레이션"""
         return await self.run_graph(self.store.session(e.session_id), intent="approve", sim_id=e.sim_id,
                                     proposal_id=p["proposal_id"], new_sim_id=new_sim)
+
+
+def apply_moves(m: dict[str, Any], moves: list[dict]) -> dict[str, Any]:
+    """VR 랙 옮기기 [{rack_id, from:[x,y], to:[x,y]}] 를 지도 사본에 적용한다.
+    랙이 아닌 칸에서 옮기거나 통로가 아닌 칸(다른 랙, 도크, 벽, 충전)에 놓으면 ValueError. 형식이 틀리면 KeyError, TypeError."""
+    m = copy.deepcopy(m)
+    for mv in moves:
+        fx, fy = (int(v) for v in mv["from"])
+        tx, ty = (int(v) for v in mv["to"])
+        kind = {(c["x"], c["y"]): c["type"] for c in m["cells"]}
+        if kind.get((fx, fy)) != "rack":
+            raise ValueError(f"({fx},{fy}) 에 랙이 없습니다")
+        if kind.get((tx, ty), "aisle") != "aisle" or not (0 <= tx < m["width"] and 0 <= ty < m["height"]):
+            raise ValueError(f"({tx},{ty}) 는 통로 칸이 아닙니다")
+        m["cells"] = [c for c in m["cells"] if (c["x"], c["y"]) not in ((fx, fy), (tx, ty))]
+        m["cells"].append({"x": tx, "y": ty, "type": "rack", "rack_id": mv.get("rack_id")})
+    return m
 
 
 def wav_rms(data: bytes) -> float:

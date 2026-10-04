@@ -11,6 +11,7 @@ import re
 from langchain_core.runnables import RunnableConfig
 
 from tools.aggregate import aggregate_logs
+from tools.outcome import explanation_lines, facts_of as outcome_facts
 from tools.proposals import apply_proposal, build_candidates
 from tools.report import robot_stats
 from . import SOURCE_LABEL, flow_of, session_of, step
@@ -88,6 +89,11 @@ async def analyze(s: AgentState, config: RunnableConfig) -> dict:
     agg = aggregate_logs(e.log, grid, top_k=10)
     robots = robot_stats(e.log)
     facts = facts_of(agg, robots, e.log["total_steps"])
+    diag = f.diagnose(e.log, e.scenario, e.map_version)            # 처리 못 한 주문: 원인, 누구 문제, 재시뮬레이션 권고
+    if not diag["completed"]:
+        facts["처리_못_함"] = outcome_facts(diag)
+        await f.status(se, "결과 점검", f"{diag['label']} → 재시뮬레이션 권고 {len(diag['recommendations'])}개")
+    head = " ".join(explanation_lines(diag))
     text, source = rule_explanation(facts), "rule"
     llm = f.interpreter.llm
     if llm is not None and agg["bottlenecks"]:
@@ -100,8 +106,11 @@ async def analyze(s: AgentState, config: RunnableConfig) -> dict:
                 log.warning("LLM 분석 설명에 집계에 없는 숫자 -> 규칙 설명: %s", cand[:120])
         except Exception as ex:
             log.warning("LLM 분석 실패 -> 규칙 설명: %s", ex)
+    if head and not (source == "llm" and diag["issues"][0]["label"] in text):
+        text = head + " " + text                                     # 처리 못 한 원인이 항상 맨 앞
     await f.status(se, "로그 분석", f"원인 설명 ({SOURCE_LABEL[source]})")
-    return {"analysis": {"agg": agg, "robots": robots, "facts": facts, "explanation": text, "source": source},
+    return {"analysis": {"agg": agg, "robots": robots, "facts": facts, "explanation": text, "source": source,
+                         "issues": diag["issues"], "recommendations": diag["recommendations"]},
             "trace": step(s, "analyze")}
 
 
@@ -111,7 +120,13 @@ async def propose(s: AgentState, config: RunnableConfig) -> dict:
     e = f.store.get_sim(s["sim_id"])
     grid = f.store.get_map(e.map_version).map
     a = s["analysis"]
-    cands = build_candidates(a["agg"], grid, e.scenario, a["robots"])
+    recs = a.get("recommendations") or []                           # 처리 못 한 주문을 없애는 재시뮬레이션 권고가 앞
+    cands, seen = [], set()
+    for c in recs + build_candidates(a["agg"], grid, e.scenario, a["robots"]):
+        k = (c["type"], str(sorted(c["apply"].items())))
+        if k not in seen:
+            seen.add(k)
+            cands.append(c)
     for i, c in enumerate(cands):
         c["key"] = f"C{i + 1}"
     chosen, reason, source = cands[:3], "", "rule"
@@ -128,6 +143,8 @@ async def propose(s: AgentState, config: RunnableConfig) -> dict:
             why = (out.get("reason") or "").strip()
             if sel and numbers_ok(why, numbers_in(payload)):
                 chosen, reason, source = [c for c in cands if c["key"] in sel], why, "llm"
+                if recs and not any(c in recs for c in chosen):        # 원인을 고치는 권고 하나는 꼭 남긴다
+                    chosen = ([cands[0]] + chosen)[:3]                 # cands[0] = 첫 재시뮬레이션 권고
             else:
                 log.warning("LLM 개선안 선택이 후보 밖이거나 숫자 불일치 -> 규칙: %s", out)
         except Exception as ex:
@@ -141,7 +158,7 @@ async def propose(s: AgentState, config: RunnableConfig) -> dict:
     explanation = a["explanation"] + (f" 개선 방향: {reason}" if reason else "")
     await f.store.emit(se, {"type": "analysis",
                             "bottlenecks": [{"x": b["x"], "y": b["y"], "wait": b["wait"]} for b in a["agg"]["bottlenecks"]],
-                            "explanation": explanation,
+                            "explanation": explanation, "issues": a.get("issues", []),
                             "proposals": [{"proposal_id": c["proposal_id"], "type": c["type"], "text": c["text"],
                                            "reason": c["reason"], "effects": c.get("effects", [])} for c in chosen]})
     return {"candidates": chosen, "trace": step(s, "propose")}

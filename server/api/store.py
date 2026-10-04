@@ -34,6 +34,7 @@ class SimEntry:
     proposals: dict[str, dict[str, Any]] = field(default_factory=dict)
     baseline_log: dict[str, Any] | None = None       # 같은 지도, 주문, 이벤트의 기준 전략 결과 (비교, 리포트 공용)
     report: dict[str, Any] | None = None
+    busy: bool = False                                # 재계획 중 (같은 planner.Sim 을 두 스레드가 동시에 건드리지 않게)
 
 
 @dataclass
@@ -44,6 +45,10 @@ class Session:
     question_id: str | None = None
     question_text: str | None = None
     question_count: int = 0
+    pending: list[str] = field(default_factory=list)   # 연결이 없을 때 보낸 결과 메시지 (재연결 시 전송, EX-02)
+
+
+PENDING_MAX = 20
 
 
 class Store:
@@ -116,9 +121,19 @@ class Store:
     async def emit(self, s: Session, msg: dict[str, Any]):
         text = json.dumps(msg, ensure_ascii=False)
         log.info("WS -> %s %s", s.session_id, text[:160])
+        sent = False
         for ws in list(s.sockets):
             try:
                 await ws.send_text(text)
+                sent = True
             except Exception:
                 if ws in s.sockets:
                     s.sockets.remove(ws)
+        if not sent and msg.get("type") != "status":      # 진행 표시는 버리고 결과 메시지만 보관
+            s.pending.append(text)
+            del s.pending[:-PENDING_MAX]
+
+    async def flush(self, s: Session, ws: WebSocket):
+        """재연결한 소켓에 끊긴 동안 쌓인 결과 메시지(map_ready, sim_ready 등)를 보낸다."""
+        while s.pending:
+            await ws.send_text(s.pending.pop(0))

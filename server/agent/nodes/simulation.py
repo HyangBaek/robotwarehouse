@@ -1,10 +1,11 @@
-"""시뮬레이션 실행 노드: 경로 계산 엔진 호출, 충돌, 미완료 점검, SQLite 저장, VR 로 sim_ready."""
+"""시뮬레이션 실행 노드: 경로 계산 엔진 호출, 충돌 점검, SQLite 저장, VR 로 sim_ready.
+주문을 다 처리하지 못해도 결과를 보내고 원인을 붙인다 (tools.outcome)."""
 import asyncio
 import time
 
 from langchain_core.runnables import RunnableConfig
 
-from tools.simulation import start_simulation, summary_ko
+from tools.simulation import start_simulation
 from . import flow_of, session_of, step
 from ..state import AgentState
 
@@ -30,6 +31,6 @@ async def simulate(s: AgentState, config: RunnableConfig) -> dict:
         await asyncio.to_thread(f.store.repo.save_approval, se.session_id, s["proposal"], s["sim_id"], sim_id)
     lg = res["log"]
     await f.status(se, "로그 분석", f"충돌 0건, 총 {lg['total_steps']} 스텝, 계산 {ms}ms")
-    await f.store.emit(se, {"type": "sim_ready", "sim_id": sim_id, "strategy": strategy,
-                            "total_steps": lg["total_steps"], "summary": summary_ko(lg)})
+    await f.store.emit(se, {"type": "sim_ready", "sim_id": sim_id, "strategy": strategy, "total_steps": lg["total_steps"],
+                            **await f.outcome_fields(se, lg, scenario, version)})
     return {"error": None, "trace": step(s, "simulate")}

@@ -111,8 +111,14 @@ async def stats(sim_id: str, request: Request):
 async def event(sim_id: str, body: dict, request: Request):
     d = get_deps(request)
     e = get_sim(request, sim_id)
-    ev = {"t": max(0, int(body.get("t", 0))), "add_orders": max(0, int(body.get("add_orders", 0))),
-          "robots": max(1, int(body.get("robots", e.scenario["robots"])))}
+    if e.busy:
+        return err(409, "REPLAN_BUSY", "재계획이 진행 중입니다. 끝난 뒤 다시 보내 주세요")
+    try:
+        ev = {"t": max(0, int(body.get("t", 0))), "add_orders": max(0, int(body.get("add_orders", 0))),
+              "robots": min(30, max(1, int(body.get("robots", e.scenario["robots"]))))}
+    except (TypeError, ValueError):
+        return err(400, "BAD_EVENT", "t, add_orders, robots 는 정수여야 합니다")
+    e.busy = True
     spawn(request, d.flow.run_event(e, ev))
     return {"status": "replanning"}
 

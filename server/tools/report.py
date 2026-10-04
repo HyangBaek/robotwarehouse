@@ -187,8 +187,8 @@ def insights(k: dict, robots: list[dict], orders: dict, agg: dict, rec: dict | N
                         "text": f"기준 전략 대비 총 처리 시간 {abs(r['improvement_pct'])}% "
                                 f"{'단축' if r['better'] else '증가'} ({r['baseline']} → {r['optimized']}스텝)"})
     if orders["done"] < orders["total"]:
-        out.append({"level": "warn", "text": f"미완료 주문 {orders['total'] - orders['done']}건 "
-                                             f"(거부 {orders['rejected']}건): 재고·용량 또는 혼잡 확인 필요"})
+        out.append({"level": "warn", "text": f"주문 {orders['total'] - orders['done']}건 처리 못 함 "
+                                             f"(거부 {orders['rejected']}건): 분석 화면에서 원인과 재시뮬레이션 권고 확인"})
     else:
         out.append({"level": "good", "text": f"주문 {orders['total']}건 모두 완료, 충돌 {k['collisions']}건, "
                                              f"운영 규칙 위반 {k['rule_violations']}건"})

@@ -158,8 +158,8 @@ server/
 | 권장 시나리오 · 시나리오 해석 | `tools/scenario.py`, `agent/interpreter.extract_scenario` | 권장 로봇 수 = 도크 수 × 2 + 4 (2~16대). 시나리오 문장·음성에서 로봇 수·주문 수·실행 여부 추출 (LLM, 실패 시 정규식) |
 | 지도 검증 | `tools/map_validator.py` | 형식, 크기, 도크 유무, 도달 가능성. 일방통행이 있으면 엔진과 같은 방향 그래프로 "들어갔다 나올 수 있는지" 검사. 오류를 모두 모아 질문으로 변환 |
 | 경로 계산 | `planner` | 시공간 A* 기반 구간 단위 우선순위 계획 + LNS 개선 + 헝가리안 작업 할당, 롤링 재계획. 기준 전략: 개별 최단 경로 + 충돌 시 대기 |
-| 결과 점검 | `tools/simulation.check_log`, `tools/invariants.py` | 충돌·미완료면 VR로 보내지 않고 `error` 전송. 엔진과 독립된 검사기(금지 칸·순간이동·주문 누락)는 테스트에서 사용 |
-| 분석·개선 | `agent/nodes/analyst.py`, `tools/aggregate.py`, `tools/proposals.py` | 칸별 대기, 로봇별 유휴 집계 → LLM이 집계 수치만 근거로 원인 설명 → 규칙이 만든 4가지 유형 후보(도크 추가, 로봇 수, 보관 분산, 일방통행) 중 LLM이 1~3개 선택. 집계에 없는 숫자나 후보 밖 선택은 버리고 규칙 결과 사용 |
+| 결과 점검 | `tools/simulation.check_log`, `tools/outcome.py`, `tools/invariants.py` | 충돌이면 VR로 보내지 않고 `error` 전송. 주문을 다 처리하지 못하면 결과는 보내고 원인(공간·재고 부족, 길 막힘, 로봇 정체, 시간 초과)과 재시뮬레이션 권고를 붙임. 엔진과 독립된 검사기(금지 칸·순간이동·주문 누락)는 테스트에서 사용 |
+| 분석·개선 | `agent/nodes/analyst.py`, `tools/aggregate.py`, `tools/proposals.py` | 칸별 대기, 로봇별 유휴 집계 → LLM이 집계 수치만 근거로 원인 설명 → 규칙이 만든 후보(도크 추가, 로봇 수, 보관 분산, 일방통행, 처리 못 한 주문이 있으면 랙·통로·주문 수 재시뮬레이션 권고를 앞에) 중 LLM이 1~3개 선택. 집계에 없는 숫자나 후보 밖 선택은 버리고 규칙 결과 사용 |
 | 제품 규격 · 운영 규칙 | `planner/engine.py`, `tools/scenario.py`, `tools/invariants.py` | 랙 규격(1100x1100 표준, 1200x1000)에 맞는 칸에만 보관, 주문 규격 비율 입력. 일방통행과 엇갈림 가능 구간(`passing_allowed`), 독립 검사기로 규칙 위반 0건 확인 |
 | 저장 · 기록 | `db/repo.py`, `api/routes_history.py`, `api/history_html.py`, VR `UI/HistoryPanel.cs` | SQLite에 지도, 시나리오, 로봇 동선(스텝별 위치), 주문 기록, 칸 통계, 리포트, 개선안 승인 저장. 서버 재시작 뒤에도 조회, 다시 재생, 재계획 |
 | 최종 리포트 | `tools/report.py`, `api/report_html.py`, VR `UI/ReportPanel.cs` | 로봇별 가동률(이동·적재·하역 비율)·대기·유휴, 주문 처리 시간(평균·중앙값·P90·최대, 배정 대기·수행 시간), 시간대별 누적 완료, 기준 전략 비교(같은 주문), 규칙 기반 인사이트. 숫자는 모두 코드가 로그에서 계산 |

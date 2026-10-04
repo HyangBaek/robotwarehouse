@@ -26,7 +26,7 @@ namespace RobotWarehouse.App
     /// 입력 -> REST 요청 -> WebSocket 이벤트 -> 창고, 로봇, 히트맵, 패널 갱신.
     /// 사용자 패널은 단계별 화면(S01 창고 만들기 -> S02 확인 -> S03 설정 -> S04 실행 -> S05 재생 -> S06 분석 -> S07 승인 -> S08 비교)으로 바뀐다.
     /// </summary>
-    public class AppController : MonoBehaviour
+    public partial class AppController : MonoBehaviour
     {
         public enum Phase { Idle, Generating, AwaitConfirm, Question, Confirmed, Simulating, Ready }
         enum VoiceTarget { Describe, Answer, Scenario }
@@ -40,7 +40,7 @@ namespace RobotWarehouse.App
         [Range(0.5f, 1f)] public float tableMargin = 0.92f;
         [Tooltip("사용자 패널 아래 가장자리 높이 (바닥 기준, m)")]
         public float panelBottom = 0.8f;
-        [Tooltip("시작할 때 관리자·디버그 패널을 보일지 (왼손 Y 또는 F1로 켜고 끔)")]
+        [Tooltip("관리자 모드로 시작 (평소에는 왼손 그립을 누른 채 Y 3번 → 사용자 패널 머리글의 ≡ 버튼으로 진입)")]
         public bool showDevPanel = false;
 
         [Header("사용자 위치")]
@@ -68,8 +68,8 @@ namespace RobotWarehouse.App
         public float miniatureSize = 1.4f;
         [Tooltip("XR Origin 기준 사용자 패널 위치 (아래 가장자리)")]
         public Vector3 userPanelOffset = new Vector3(0.75f, 0.8f, 1.2f);
-        [Tooltip("XR Origin 기준 관리자 패널 위치 (아래 가장자리)")]
-        public Vector3 devPanelOffset = new Vector3(-1.0f, 0.6f, 1.0f);
+        [Tooltip("XR Origin 기준 관리자 패널 위치 (아래 가장자리, 테이블 없을 때)")]
+        public Vector3 devPanelOffset = new Vector3(0.6f, 0.8f, 1.5f);
 
         public Phase CurrentPhase { get; private set; } = Phase.Idle;
         public WarehouseRenderer Warehouse => _warehouse;
@@ -154,7 +154,7 @@ namespace RobotWarehouse.App
             SetPhase(Phase.Idle);
             GoCreate();
             if (AppConfig.AutoConnect) Connect();
-            else _ui.Log("관리자 패널의 '다시 연결'로 서버에 연결합니다. 서버 없이 보려면 '오프라인 재생'.");
+            else Log(LogLevel.Info, LogModule.Ws, "자동 연결 꺼짐: 관리자 모드 Connection의 Reconnect로 연결합니다");
         }
 
         void OnDestroy()
@@ -235,7 +235,7 @@ namespace RobotWarehouse.App
             _recorder.OnRecorded += OnVoiceRecorded;
             _playback.OnFinished += () =>
             {
-                _ui.Log($"재생 완료: 총 {_playback.Timeline.TotalSteps} 스텝");
+                Log(LogLevel.Info, LogModule.Sim, $"재생 완료: 총 {_playback.Timeline.TotalSteps} 스텝");
                 if (_user.Current == UserScreen.Playback) _user.Toast("재생이 끝났어요. ▶ 를 누르면 처음부터 다시 봅니다", ToastKind.Info);
                 OnPlaybackFinished();
             };
@@ -250,7 +250,7 @@ namespace RobotWarehouse.App
             _dev = _ui.Dev;
             // 화면이 바뀌면 예약된 화면 전환, 응답 대기 시간 초과를 무효로
             _user.OnScreenChanged += _ => _screenToken++;
-            _dev.SetVisible(showDevPanel);
+            BuildAdmin();
             PlacePanels();
             _report = new ReportPanel();
             _report.Build(null);
@@ -317,19 +317,6 @@ namespace RobotWarehouse.App
             _user.CmpAfterHeat.onClick.AddListener(() => ShowStatsHeatmap(false));
             _user.CmpPlayback.onClick.AddListener(() => { RestoreAfterStats(); GoPlayback(); });
             _user.CmpRerun.onClick.AddListener(GoSimConfig);
-
-            // 관리자 패널
-            _dev.ConnectButton.onClick.AddListener(Connect);
-            _dev.OfflineButton.onClick.AddListener(PlayOffline);
-            _dev.ViewModeButton.onClick.AddListener(ToggleViewMode);
-            _dev.CompareButton.onClick.AddListener(RequestCompare);
-            _dev.AddOrdersButton.onClick.AddListener(() => SendSimEvent(10, _user.Robots.Value));
-            _dev.ChangeRobotsButton.onClick.AddListener(() => SendSimEvent(0, _user.Robots.Value));
-            for (int i = 0; i < _dev.ExampleButtons.Count; i++)
-            {
-                var text = DevPanel.ExampleSentences[i].text;
-                _dev.ExampleButtons[i].onClick.AddListener(() => GoManual(VoiceTarget.Describe, text));
-            }
         }
 
         Transform Rig => Camera.main != null ? Camera.main.transform.root : null;
@@ -351,17 +338,20 @@ namespace RobotWarehouse.App
             var dev = _dev.Canvas.transform;
             float userW = UserPanel.Width * user.localScale.x;
             float userH = UserPanel.FullHeight * user.localScale.y;
-            float devW = ((RectTransform)dev).sizeDelta.x * dev.localScale.x;
+            float devW = DevPanel.Width * DevPanel.MetersPerPixel;
+            float devH = DevPanel.Height * DevPanel.MetersPerPixel;
             if (TableLayout.TryGetTop(table, out var top))
             {
+                // 사용자 패널과 관리자 패널은 같은 자리(테이블 오른쪽)에 하나만 보인다
                 user.parent.SetParent(null, false);
                 float floorY = Rig != null ? Rig.position.y : 0f;
-                TableLayout.PlacePanels(top, ViewerPosition(), floorY, panelBottom, devW, userW, userH, dev, user);
+                TableLayout.PlacePanels(top, ViewerPosition(), floorY, panelBottom, 0f, userW, userH, null, user);
+                TableLayout.PlacePanels(top, ViewerPosition(), floorY, panelBottom, 0f, devW, devH, null, dev);
                 return;
             }
             user.parent.SetParent(Rig, false);
             PlacePanel(user, userPanelOffset, userH);
-            PlacePanel(dev, devPanelOffset, userH);
+            PlacePanel(dev, devPanelOffset, devH);
         }
 
         void PlacePanel(Transform panel, Vector3 offset, float height)
@@ -403,9 +393,6 @@ namespace RobotWarehouse.App
             UIFactory.SetInteractable(_user.SettingsButton, Connected && _mapConfirmed && !_offline && !busy);
             UIFactory.SetInteractable(_user.QuestionSpeak, Connected && !busy);
             UIFactory.SetInteractable(_user.CmpRerun, Connected && _mapConfirmed && !_offline);
-            _dev.CompareButton.interactable = hasSim && !busy;
-            _dev.AddOrdersButton.interactable = hasSim && !busy;
-            _dev.ChangeRobotsButton.interactable = hasSim && !busy;
             _user.CreateStatus.text = Connected ? "" : _offline ? "저장된 결과를 재생하는 중이에요" : "서버 연결을 기다리는 중이에요";
         }
 
@@ -513,6 +500,7 @@ namespace RobotWarehouse.App
         {
             _work = work;
             _screenToken++;
+            BeginAgentRun(work, title);
             _user.SetProcessing(items);
             _user.SetProcessingIndex(active);
             _user.Show(UserScreen.Processing, step, title);
@@ -587,14 +575,11 @@ namespace RobotWarehouse.App
         {
             _offline = false;
             _api = new ApiClient(AppConfig.HttpBase);
-            _dev.ConnectionDetail.text = $"연결 중… {AppConfig.HttpBase}";
+            Log(LogLevel.Info, LogModule.Ws, $"연결 시도 {AppConfig.HttpBase}");
+            _wsReconnects = 0;
             _user.SetConnection(ConnectionView.Connecting);
             _ws.Connect(AppConfig.WsBase + ApiRoutes.WebSocket(AppConfig.SessionId));
-            StartCoroutine(_api.Get(ApiRoutes.Health, r =>
-            {
-                if (!r.Ok) _ui.Log($"<color=#FF8080>서버 응답 없음 ({AppConfig.HttpBase}): {r.ErrorMessage}</color>\n" +
-                                   "에디터 메뉴 RobotWarehouse > 1. 서버 연결 에서 주소를 확인하세요.");
-            }));
+            Ping();
         }
 
         void HandleWsState(WsState s)
@@ -602,23 +587,23 @@ namespace RobotWarehouse.App
             switch (s)
             {
                 case WsState.Connected:
-                    _dev.ConnectionDetail.text = $"<color=#7CFC9A>연결됨</color>  {AppConfig.HttpBase}\n세션 {AppConfig.SessionId}";
+                    Log(LogLevel.Info, LogModule.Ws, $"WebSocket 연결됨 (세션 {AppConfig.SessionId})");
                     _user.SetConnection(_offline ? ConnectionView.Offline : ConnectionView.Connected);
                     // EX-02: 재연결 뒤 마지막 sim_id 프레임 이어 받기
                     if (!string.IsNullOrEmpty(_simId) && !_framesComplete && !_offline)
                         StartCoroutine(FetchFrames(_simId, _playback.Timeline.LoadedUntil + 1, ++_fetchGeneration));
                     break;
                 case WsState.Connecting:
-                    _dev.ConnectionDetail.text = "연결 중…";
                     _user.SetConnection(_offline ? ConnectionView.Offline : ConnectionView.Connecting);
                     break;
                 case WsState.Reconnecting:
-                    _dev.ConnectionDetail.text = "<color=#FFB060>서버 재연결 중…</color> (5초 간격)";
+                    _wsReconnects++;
+                    Log(LogLevel.Warn, LogModule.Ws, "WebSocket 끊김 → 5초 간격 재연결");
                     _user.SetConnection(_offline ? ConnectionView.Offline : ConnectionView.Reconnecting);
                     AbortOnDisconnect();
                     break;
                 default:
-                    _dev.ConnectionDetail.text = "연결 안 됨";
+                    Log(LogLevel.Warn, LogModule.Ws, "WebSocket 연결 안 됨");
                     _user.SetConnection(_offline ? ConnectionView.Offline : ConnectionView.Disconnected);
                     AbortOnDisconnect();
                     break;
@@ -643,9 +628,12 @@ namespace RobotWarehouse.App
                 return;
             }
             _user.HideToast();
-            if (logText != null) _ui.Log(logText);
+            _txCount++;
+            _lastTx = DateTime.Now;
+            Log(LogLevel.Info, LogModule.Api, $"POST {path}" + (logText != null ? $" · {logText}" : ""));
             StartCoroutine(_api.PostJson(path, body, r =>
             {
+                if (!r.Ok) Log(LogLevel.Error, LogModule.Api, $"POST {path} 실패: {r.ErrorMessage}", r.TimedOut ? "TIMEOUT" : $"HTTP_{r.Status}", null, r.Text);
                 if (r.Ok) onOk?.Invoke(r);
                 else ShowError(r.ErrorMessage, retry);
             }));
@@ -654,7 +642,8 @@ namespace RobotWarehouse.App
         /// <summary>오류: 토스트로 알리고(다시 시도 버튼), 진행 중이던 화면에서 알맞은 이전 화면으로 돌아간다.</summary>
         void ShowError(string message, Action retry)
         {
-            _ui.Log($"<color=#FF8080>{message}</color>");
+            Log(LogLevel.Error, ModuleOf(_work), message);
+            _agent.Finish(RunState.Error, message, null);
             _user.Toast(string.IsNullOrEmpty(message) ? "요청을 처리하지 못했어요" : message, ToastKind.Error, 6f,
                 retry != null ? "다시 시도" : null, retry);
             var work = _work;
@@ -774,7 +763,7 @@ namespace RobotWarehouse.App
                 return;
             }
             ShowProcessing(Work.Stt, answer ? 2 : 1, "음성을 인식하고 있어요", SttSteps, 1);
-            _ui.Log($"음성 전송 ({wav.Length / 1024} KB)");
+            Log(LogLevel.Info, LogModule.Vr, $"음성 전송 ({wav.Length / 1024} KB, stt_only)");
             StartCoroutine(_api.PostAudio(ApiRoutes.MapVoice, AppConfig.SessionId, wav, r =>
             {
                 if (!r.Ok) ShowError(r.ErrorMessage, null);
@@ -793,7 +782,7 @@ namespace RobotWarehouse.App
                     GoSimConfig();
                     return;
                 }
-                _ui.Log($"시나리오 음성: \"{text.Trim()}\"");
+                Log(LogLevel.Info, LogModule.Agent, $"시나리오 음성: \"{text.Trim()}\"");
                 AdvanceProcessing(2);
                 return;   // 결과는 WS scenario 로 온다 (OnScenario)
             }
@@ -806,11 +795,12 @@ namespace RobotWarehouse.App
                 return;
             }
             _lastTranscript = text.Trim();
-            _ui.Log($"인식: \"{_lastTranscript}\"");
+            Log(LogLevel.Info, LogModule.Agent, $"STT 인식: \"{_lastTranscript}\"", null, null, msg.Raw);
             var flag = msg.Get("stt_only");
             bool sttOnly = flag != null && flag.Type == JTokenType.Boolean && (bool)flag;
             if (sttOnly)
             {
+                _agent.Finish(RunState.Completed, "transcript (stt_only)", msg.Raw);
                 // 인식 결과를 보여 주고 사용자가 '생성하기'를 눌러야 만든다 (STT 오류 확인)
                 FinishProcessing(() =>
                 {
@@ -837,6 +827,7 @@ namespace RobotWarehouse.App
             text = text?.Trim();
             if (string.IsNullOrEmpty(text) || string.IsNullOrEmpty(_questionId)) { GoQuestion(); return; }
             var qid = _questionId;
+            _lastAnswerText = text;
             SetPhase(Phase.Generating);
             ShowProcessing(Work.Map, 2, "답변을 반영하고 있어요", MapSteps);
             Post(ApiRoutes.MapAnswer, new { session_id = AppConfig.SessionId, question_id = qid, text },
@@ -861,7 +852,7 @@ namespace RobotWarehouse.App
             Post(ApiRoutes.MapConfirm, new { session_id = AppConfig.SessionId, map_version = _mapVersion }, r =>
             {
                 _mapConfirmed = true;
-                _ui.Log($"지도 v{_mapVersion} 확정");
+                Log(LogLevel.Info, LogModule.Api, $"지도 v{_mapVersion} 확정");
                 SetPhase(Phase.Confirmed);
                 _user.Toast("창고를 확정했어요. 시뮬레이션 조건을 정해 주세요", ToastKind.Success, 3f);
                 GoSimConfig();
@@ -888,7 +879,7 @@ namespace RobotWarehouse.App
             Post(ApiRoutes.Scenario, body, r =>
             {
                 var id = (string)(r.Json as JObject)?["sim_id"];
-                if (!string.IsNullOrEmpty(id)) _ui.Log($"시뮬레이션 요청됨 (sim {id})");
+                if (!string.IsNullOrEmpty(id)) Log(LogLevel.Info, LogModule.Sim, $"시뮬레이션 요청됨 (sim {id})");
                 AdvanceProcessing(1);
             }, $"시뮬레이션 요청: 로봇 {body.robots}대, 입하 {body.inbound}, 출하 {body.outbound}", RunScenario);
         }
@@ -950,8 +941,8 @@ namespace RobotWarehouse.App
             ShowProcessing(Work.Sim, 4, "개선안을 적용하고 있어요", ImproveSteps);
             Post(ApiRoutes.ImproveApprove, new { session_id = AppConfig.SessionId, proposal_id = p.proposalId }, r =>
             {
-                _ui.Log($"개선안 적용: {p.text} → 재시뮬레이션");
-                // 로봇 대수 개선안이면 설정 화면 값도 맞춘다 ("로봇 6대 -> 4대" 형식, 가정)
+                Log(LogLevel.Info, LogModule.Agent, $"개선안 적용: {p.text} → 재시뮬레이션");
+                // 로봇 대수 개선안이면 설정 화면 값도 맞춘다 ("로봇 6대 → 4대" 형식, 가정)
                 var m = Regex.Match(p.text ?? "", @"→\s*(\d+)\s*대");
                 if (p.type == "robot_count" && m.Success) _user.Robots.Value = int.Parse(m.Groups[1].Value);
             }, null, () => ApproveProposal(p));
@@ -987,9 +978,11 @@ namespace RobotWarehouse.App
 
         void HandleWsMessage(string raw)
         {
+            _rxCount++;
+            _lastRx = DateTime.Now;
             ServerMessage msg;
             try { msg = ServerMessage.Parse(raw); }
-            catch (Exception e) { Debug.LogWarning($"[WS] JSON 파싱 실패: {e.Message}"); return; }
+            catch (Exception e) { Log(LogLevel.Error, LogModule.Ws, $"JSON 파싱 실패: {e.Message}", "PARSE_ERROR", null, raw); return; }
 
             switch (msg.Type)
             {
@@ -1001,9 +994,10 @@ namespace RobotWarehouse.App
                 case ServerMessage.Analysis: OnAnalysis(msg); break;
                 case ServerMessage.Error: OnServerError(msg); break;
                 case ServerMessage.Status: OnStatus(msg); break;
+                case ServerMessage.Tts: break;
                 case ServerMessage.Scenario: OnScenario(msg); break;
                 case ServerMessage.Report: OnReport(msg); break;
-                default: Debug.Log($"[WS] 알 수 없는 type: {msg.Type}"); break;
+                default: Log(LogLevel.Warn, LogModule.Ws, $"알 수 없는 type: {msg.Type}", "UNKNOWN_TYPE", null, msg.Raw); break;
             }
         }
 
@@ -1011,7 +1005,8 @@ namespace RobotWarehouse.App
         {
             var code = msg.GetString("code");
             var text = msg.GetString("message");
-            _ui.Log($"<color=#FF8080>{code} {text}</color>");
+            Log(LogLevel.Error, ModuleOfCode(code), text, code, ErrorCell(msg), msg.Raw);
+            _agent.Finish(RunState.Error, $"{code} {text}", msg.Raw);
             switch (code)
             {
                 case "STT_EMPTY":
@@ -1044,7 +1039,8 @@ namespace RobotWarehouse.App
         {
             var node = msg.GetString("node");
             var text = msg.GetString("message", node);
-            _ui.Log($"<color=#9EC9FF>· [{node}] {text}</color>");
+            Log(LogLevel.Debug, LogModule.Agent, $"[{node}] {text}", null, null, msg.Raw);
+            _agent.Node(node, text, msg.GetString("tool", null), msg.Raw);
             if (_user.Current != UserScreen.Processing) return;
             string n = (node ?? "").ToLowerInvariant();
             int next = _user.ProcessingIndex + 1;
@@ -1090,7 +1086,7 @@ namespace RobotWarehouse.App
             catch (Exception e) { ShowError("지도 데이터를 읽지 못했어요: " + e.Message, null); return; }
 
             if (map.schemaVersion != GridMap.SupportedSchemaVersion)
-                _ui.Log($"<color=#FFB060>스키마 버전 불일치: 서버 {map.schemaVersion}, VR {GridMap.SupportedSchemaVersion}</color>");
+                Log(LogLevel.Warn, LogModule.Validator, $"스키마 버전 불일치: 서버 {map.schemaVersion}, VR {GridMap.SupportedSchemaVersion}", "SCHEMA_VERSION");
 
             _mapVersion = msg.GetString("map_version");
             _serverMapJson = msg.Get("map")?.ToString();
@@ -1103,8 +1099,8 @@ namespace RobotWarehouse.App
             ResetSimulation();
 
             var summary = SimParsers.Describe(msg.Get("summary"));
-            _ui.Log($"<b>지도 v{_mapVersion} 생성</b> {map.width}×{map.height}, 랙 {map.CountCells(CellType.Rack)}칸");
-            if (!string.IsNullOrEmpty(summary)) _ui.Log(summary);
+            Log(LogLevel.Info, LogModule.Agent, $"map_ready v{_mapVersion}: {map.width}×{map.height}, 랙 {map.CountCells(CellType.Rack)}칸. {summary}", null, null, msg.Raw);
+            _agent.Finish(RunState.Completed, $"map_ready v{_mapVersion}", msg.Raw);
             var defaults = msg.GetStringList("defaults_applied");
 
             _user.SetConfirmSummary(MapChips(map));
@@ -1167,7 +1163,10 @@ namespace RobotWarehouse.App
             _questionRounds++;
             var cells = msg.GetCells("error_cells");
             if (_warehouse.Map != null) _warehouse.SetHighlight(cells);
-            _ui.Log($"<color=#FFD37A>Agent 질문 ({_questionRounds}/{AppConfig.MaxQuestionRounds}) {_questionText}</color>");
+            var codes = msg.GetStringList("errors");
+            Log(LogLevel.Warn, LogModule.Validator, $"검증 실패 → Agent 질문 ({_questionRounds}/{AppConfig.MaxQuestionRounds}): {_questionText}",
+                codes.Count > 0 ? string.Join(",", codes) : "VALIDATION", cells.Count > 0 ? new Vector2Int(cells[0].x, cells[0].y) : (Vector2Int?)null, msg.Raw);
+            _agent.Finish(RunState.Question, "question: " + (codes.Count > 0 ? string.Join(",", codes) : _questionText), msg.Raw);
 
             _user.QuestionProblem.text = cells.Count > 0 ? $"<color={UIFactory.Hex(UIFactory.Danger)}>■</color>  문제 칸 {cells.Count}개를 창고에 빨간색으로 표시했어요" : "";
             _user.QuestionText.text = _questionText;
@@ -1215,7 +1214,7 @@ namespace RobotWarehouse.App
                 _playback.Timeline.DropFrom(replanFrom);
                 _playback.Timeline.TotalSteps = total;
                 _framesComplete = false;
-                _ui.Log($"재계획 완료: 스텝 {replanFrom} 이후 갱신 (총 {total} 스텝, {msg.GetString("replan_ms", "?")}ms)");
+                Log(LogLevel.Info, LogModule.Sim, $"재계획 완료: 스텝 {replanFrom} 이후 갱신 (총 {total} 스텝, {msg.GetString("replan_ms", "?")}ms)", null, null, msg.Raw);
                 _user.Toast($"스텝 {replanFrom} 이후 경로를 다시 계산했어요", ToastKind.Info);
                 StartCoroutine(FetchFrames(simId, replanFrom, ++_fetchGeneration));
                 StartCoroutine(FetchStats(simId));
@@ -1240,7 +1239,9 @@ namespace RobotWarehouse.App
             _warehouse.ClearMarkers();
             _proposals.Clear();
             _simSummary = SummaryLine(msg.Get("summary"));
-            _ui.Log($"<b>시뮬레이션 완료</b> ({strategy}) 총 {total} 스텝. {SimParsers.Describe(msg.Get("summary"))}");
+            Log(LogLevel.Info, LogModule.Sim, $"sim_ready ({strategy}) 총 {total} 스텝. {SimParsers.Describe(msg.Get("summary"))}", null, null, msg.Raw);
+            _agent.Finish(RunState.Completed, $"sim_ready {simId} · {total} 스텝", msg.Raw);
+            _simStrategy = strategy;
             SetPhase(Phase.Ready);
             StartCoroutine(FetchFrames(simId, 0, ++_fetchGeneration));
             StartCoroutine(FetchStats(simId));
@@ -1259,7 +1260,7 @@ namespace RobotWarehouse.App
             _user.Inbound.Value = (int?)o["inbound"] ?? _user.Inbound.Value;
             _user.Outbound.Value = (int?)o["outbound"] ?? _user.Outbound.Value;
             _user.SpecB.Value = (int?)o["spec_b_pct"] ?? 0;
-            _ui.Log($"권장 시나리오: 로봇 {_user.Robots.Value}대 ({(string)o["basis"]})");
+            Log(LogLevel.Info, LogModule.Sim, $"권장 시나리오: 로봇 {_user.Robots.Value}대 ({(string)o["basis"]})");
         }
 
         /// <summary>시나리오 음성 해석 결과 -> 설정 화면 값. run 이면 바로 실행.</summary>
@@ -1297,7 +1298,7 @@ namespace RobotWarehouse.App
             _lastReport = msg.Root;
             _reportSimId = msg.GetString("sim_id");
             if (_reportSimId != _simId) return;
-            _ui.Log("최종 리포트 준비됨");
+            Log(LogLevel.Info, LogModule.Sim, "최종 리포트 준비됨");
             if (_showReportWhenReady) { _showReportWhenReady = false; ShowReport(); }
         }
 
@@ -1373,9 +1374,11 @@ namespace RobotWarehouse.App
             if (!(summary is JObject o)) return "";
             var parts = new List<string>();
             var done = o["완료 주문"] ?? o["orders_done"];
-            if (done != null) parts.Add($"완료 주문 {done}건");
+            if (done != null) parts.Add(done.ToString().Contains("/") ? $"완료 주문 {done}" : $"완료 주문 {done}건");
             var wait = o["대기 합계"] ?? o["wait_total"];
             if (wait != null) parts.Add($"대기 {wait}회");
+            var unfinished = o["처리 못 함"];   // 서버가 주문을 다 처리하지 못했을 때 원인 문장 (docs/api.md)
+            if (unfinished != null) parts.Add(unfinished.ToString());
             parts.Add("충돌 0건");
             return string.Join("  ·  ", parts);
         }
@@ -1448,7 +1451,7 @@ namespace RobotWarehouse.App
                     : "혼잡도 기록을 받지 못해 대기 비교는 빠졌어요");
                 _user.CmpHeatRow.SetActive(_statsBefore != null && _statsAfter != null);
                 ShowStatsHeatmap(false);
-                _ui.Log($"개선 전→후: 스텝 {b.steps}→{afterSteps}, 대기 {b.wait}→{afterWait}");
+                Log(LogLevel.Info, LogModule.Sim, $"개선 전→후: 스텝 {b.steps}→{afterSteps}, 대기 {b.wait}→{afterWait}");
                 FinishProcessing(() => _user.Show(UserScreen.Comparison, 4, "개선 결과"));
             }
         }
@@ -1481,7 +1484,9 @@ namespace RobotWarehouse.App
             var baseline = msg.Get("baseline") as JObject;
             var optimized = msg.Get("optimized") as JObject;
             float pct = msg.GetFloat("improvement_pct");
-            _ui.Log($"비교 결과: 개선율 {pct:0.0}%");
+            Log(LogLevel.Info, LogModule.Sim, $"비교 결과: 개선율 {pct:0.0}%", null, null, msg.Raw);
+            _agent.Finish(RunState.Completed, $"compare {pct:0.0}%", msg.Raw);
+            _lastCompare = msg.Root;
             var rows = new List<(string, string, string, string, bool)>();
             if (baseline != null && optimized != null)
             {
@@ -1508,7 +1513,9 @@ namespace RobotWarehouse.App
         {
             var bottlenecks = msg.Get("bottlenecks")?.ToObject<List<Bottleneck>>() ?? new List<Bottleneck>();
             _warehouse.SetBottleneckMarkers(bottlenecks);
-            _ui.Log("병목: " + string.Join(", ", bottlenecks.Take(5).Select(b => $"({b.x},{b.y}) 대기 {b.wait}")));
+            Log(LogLevel.Info, LogModule.Agent, "병목: " + string.Join(", ", bottlenecks.Take(5).Select(b => $"({b.x},{b.y}) 대기 {b.wait}")),
+                "BOTTLENECK", bottlenecks.Count > 0 ? new Vector2Int(bottlenecks[0].x, bottlenecks[0].y) : (Vector2Int?)null, msg.Raw);
+            _agent.Finish(RunState.Completed, $"analysis 병목 {bottlenecks.Count}곳", msg.Raw);
 
             if (bottlenecks.Count > 0)
             {
@@ -1593,7 +1600,6 @@ namespace RobotWarehouse.App
         void ToggleViewMode()
         {
             _miniature = !_miniature;
-            UIFactory.SetButtonText(_dev.ViewModeButton, _miniature ? "보기: 미니어처" : "보기: 실물 1:1");
             if (_miniature)
             {
                 SetLifeSizeVisuals(false, Vector3.zero, 0f);
@@ -1603,11 +1609,11 @@ namespace RobotWarehouse.App
             {
                 ApplyViewMode();
                 PlacePanelsAroundViewer();
-                if (_warehouse.Map == null) _ui.Log("실물 보기: 창고를 만들거나 오프라인 재생을 누르면 발밑 2m 아래에 1:1로 펼쳐집니다");
+                if (_warehouse.Map == null) Log(LogLevel.Info, LogModule.Vr, "실물 보기: 창고를 만들거나 오프라인 재생을 누르면 발밑 아래에 1:1로 펼쳐집니다");
             }
         }
 
-        /// <summary>실물 보기: 지금 보는 방향 기준 오른쪽 아래에 사용자 패널, 왼쪽에 관리자 패널.</summary>
+        /// <summary>실물 보기: 지금 보는 방향 기준 오른쪽 아래에 사용자(또는 관리자) 패널.</summary>
         void PlacePanelsAroundViewer()
         {
             var cam = Camera.main;
@@ -1624,7 +1630,8 @@ namespace RobotWarehouse.App
             basePos.y = floorY + panelBottom;
             float h = UserPanel.FullHeight * user.localScale.y;
             TableLayout.Place(user, basePos + fwd * 1.2f + rightDir * 0.55f, cam.transform.position, h);
-            TableLayout.Place(dev, basePos + fwd * 1.0f - rightDir * 1.0f + Vector3.down * 0.2f, cam.transform.position, h);
+            // 관리자 패널은 사용자 패널 대신 같은 방향, 조금 더 멀리 (1.6m)
+            TableLayout.Place(dev, basePos + fwd * 1.6f + rightDir * 0.5f, cam.transform.position, DevPanel.Height * DevPanel.MetersPerPixel);
         }
 
         // ---------- 실물 보기 연출: 씬 바닥 숨김, 유리 바닥, 반투명 벽 ----------
@@ -1745,7 +1752,7 @@ namespace RobotWarehouse.App
             var statsAsset = Resources.Load<TextAsset>("Offline/s2_stats");
             if (mapAsset == null || framesAsset == null)
             {
-                _ui.Log("<color=#FF8080>오프라인 데이터가 없어요 (Resources/Offline)</color>");
+                Log(LogLevel.Error, LogModule.Vr, "오프라인 데이터가 없어요 (Resources/Offline)", "NO_OFFLINE_DATA");
                 return;
             }
             _offline = true;
@@ -1767,7 +1774,8 @@ namespace RobotWarehouse.App
             _playback.ApplyPositions();
             _playback.Play();
             _simSummary = "저장된 시연 데이터 (W2 + S2)";
-            _ui.Log($"<b>오프라인 재생</b> W2 + S2: 로봇 {_playback.Timeline.RobotIds.Count}대, {_playback.Timeline.TotalSteps} 스텝");
+            Log(LogLevel.Info, LogModule.Sim, $"오프라인 재생 W2 + S2: 로봇 {_playback.Timeline.RobotIds.Count}대, {_playback.Timeline.TotalSteps} 스텝");
+            _simStrategy = "offline";
             _user.SetConnection(ConnectionView.Offline);
             SetPhase(Phase.Ready);
             GoPlayback();
@@ -1790,8 +1798,8 @@ namespace RobotWarehouse.App
                 if (_history?.Canvas != null) XRSupport.RefreshRaycasters(_history.Canvas);
             }
 
-            // 오른손 A 버튼: 누른 채 말하기 (창고 만들기, 인식 결과, 질문 화면). 녹음 화면에서 누르면 녹음 종료.
-            bool a = XRSupport.RightButton(UnityEngine.XR.CommonUsages.primaryButton);
+            // 오른손 A 버튼: 누른 채 말하기 (창고 만들기·인식 결과·질문 화면). 녹음 화면에서 누르면 녹음 종료.
+            bool a = XRSupport.RightButton(UnityEngine.XR.CommonUsages.primaryButton) && !_adminMode;
             if (a && !_prevA)
             {
                 var sc = _user.Current;
@@ -1812,12 +1820,8 @@ namespace RobotWarehouse.App
             }
             _prevA = a;
 
-            // 왼손 Y 버튼 / F1: 관리자, 디버그 패널 켜고 끄기
-            bool y = XRSupport.LeftButton(UnityEngine.XR.CommonUsages.secondaryButton);
-            var kb = UnityEngine.InputSystem.Keyboard.current;
-            if ((y && !_prevY) || (kb != null && kb.f1Key.wasPressedThisFrame))
-                _dev.SetVisible(!_dev.Visible);
-            _prevY = y;
+            // 관리자 메뉴 비밀 입력 (왼손 그립 + Y 3번) → 사용자 패널에 ≡ 버튼이 잠깐 나타남
+            TickAdminGesture();
 
             // 오른손 B 버튼: 미니어처 보기면 테이블 앞으로 다시 맞춤, 실물 보기면 패널만 지금 위치 기준으로
             bool b = XRSupport.RightButton(UnityEngine.XR.CommonUsages.secondaryButton);
@@ -1854,6 +1858,7 @@ namespace RobotWarehouse.App
             }
 
             UpdatePlaybackUi();
+            TickAdmin();
         }
 
         // ---------- 재생 UI 갱신 (값이 바뀔 때만 -> 캔버스 레이아웃 재계산 최소화) ----------
@@ -1898,8 +1903,6 @@ namespace RobotWarehouse.App
             }
             if (changed || fpsChanged)
             {
-                if (_dev.Visible)
-                    _dev.StepText.text = $"스텝 {step} / {tl.TotalSteps}   받은 프레임 {tl.LoadedUntil + 1}   {_fps} fps";
             }
             if (showing && changed)
             {

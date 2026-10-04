@@ -60,6 +60,7 @@ namespace RobotWarehouse.UI
 
         // S01 창고 만들기
         public Button SpeakButton, ManualButton, HistoryButton;
+        public Button AdminButton;   // 머리글 오른쪽 '≡' (관리자 모드 진입, 평소 숨김)
         public Text CreateStatus, RequiredInfo;
 
         /// <summary>디지털 트윈에 필요한 지도 정보 (서버 tools/map_generator.REQUIRED_ITEMS 와 같은 순서). 빠지면 Agent 가 되묻는다.</summary>
@@ -221,6 +222,16 @@ namespace RobotWarehouse.UI
             _connText.fontStyle = FontStyle.Bold;
             _connText.horizontalOverflow = HorizontalWrapMode.Overflow;
             UIFactory.SetWidth(_connText, 190);
+
+            // 관리자 메뉴 버튼: 평소에는 숨김. 컨트롤러 비밀 입력(왼손 그립 + Y 3번)을 하면 잠깐 나타난다
+            AdminButton = UIFactory.Button(row, "≡", null, new Color(1f, 1f, 1f, 0.14f), 60, 60, UIFactory.FontTitle);
+            AdminButton.gameObject.SetActive(false);
+        }
+
+        /// <summary>머리글의 관리자 메뉴 버튼 보이기 (비밀 입력 뒤 일정 시간).</summary>
+        public void SetSettingsVisible(bool on)
+        {
+            if (AdminButton != null && AdminButton.gameObject.activeSelf != on) AdminButton.gameObject.SetActive(on);
         }
 
         /// <summary>화면 틀: Content(남는 높이) + 구분선 + Footer(높이 120 버튼 줄).</summary>
