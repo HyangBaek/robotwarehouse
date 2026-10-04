@@ -7,7 +7,7 @@ MODULES = [
     "services.llm", "services.stt", "services.tts", "db.repo",
     "tools.map_generator", "tools.map_validator", "tools.orders", "tools.simulation",
     "tools.aggregate", "tools.compare", "tools.proposals",
-    "engine", "engine.collision", "engine.replan", "engine.planner.prioritized",
+    "planner", "tools.invariants",
     "agent.state", "agent.routing", "agent.graph", "api.main",
 ]
 
@@ -44,7 +44,7 @@ def test_ws_hello(tmp_path):
 
 
 def test_invariants_detect_swap():
-    from engine.collision import check_invariants
+    from tools.invariants import check_invariants
     grid = {"width": 3, "height": 1, "cells": []}
     log = {"frames": [
         {"t": 0, "robots": [{"id": 0, "x": 0, "y": 0}, {"id": 1, "x": 1, "y": 0}]},

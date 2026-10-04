@@ -1,5 +1,8 @@
-"""불변 조건 검사 (NFR-04). 모든 시뮬레이션 결과에 적용한다."""
-from .grid import BLOCKED
+"""불변 조건 검사 (NFR-04). 경로 엔진(planner)과 독립된 검사기로 시뮬레이션 로그를 다시 확인한다.
+
+planner.find_collisions(점·맞교환 충돌)에 더해 금지 칸 진입, 순간이동, 주문 누락·중복 완료까지 본다.
+"""
+BLOCKED = {"wall", "rack"}
 
 
 def check_invariants(log: dict, grid: dict) -> list[dict]:

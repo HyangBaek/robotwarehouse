@@ -1,6 +1,6 @@
 """격자 지도 스키마 (DR-01). docs/schema.md 와 같은 내용이어야 한다."""
 from typing import Literal, Optional
-from pydantic import BaseModel
+from pydantic import BaseModel, ConfigDict, Field
 
 SCHEMA_VERSION = "1.0"
 CellType = Literal["aisle", "rack", "wall", "dock_in", "dock_out", "charge"]
@@ -28,7 +28,8 @@ class Dock(BaseModel):
 
 
 class OneWay(BaseModel):
-    from_: tuple[int, int]
+    model_config = ConfigDict(populate_by_name=True)
+    from_: tuple[int, int] = Field(alias="from")
     to: tuple[int, int]
     dir: Literal["N", "S", "E", "W"]
 

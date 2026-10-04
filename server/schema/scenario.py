@@ -4,11 +4,10 @@ from pydantic import BaseModel
 
 
 class Order(BaseModel):
+    """planner.create_orders 출력과 같은 필드."""
     order_id: str
-    kind: Literal["inbound", "outbound"]
-    spec: str
-    qty: int = 1
-    arrive_t: int = 0
+    type: Literal["inbound", "outbound"]
+    arrival_t: int = 0
 
 
 class Scenario(BaseModel):
