@@ -1,4 +1,4 @@
-"""aggregate_logs: 처리 시간, 칸별 통과·대기, 병목 후보 (FR-25, FR-26). 숫자는 모두 여기서 계산한다."""
+"""aggregate_logs: 처리 시간, 칸별 통과, 대기, 병목 후보 (FR-25, FR-26). 숫자는 모두 여기서 계산한다."""
 
 
 def aggregate_logs(log: dict, grid: dict, top_k: int = 10) -> dict:

@@ -1,4 +1,4 @@
-"""create_orders: 시나리오 → 주문 목록 (FR-12). 같은 seed면 같은 주문 (TC-ENG-02)."""
+"""create_orders: 시나리오 -> 주문 목록 (FR-12). 같은 seed면 같은 주문 (TC-ENG-02)."""
 from planner import DEFAULT_CFG
 from planner import create_orders as _create
 

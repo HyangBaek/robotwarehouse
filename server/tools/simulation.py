@@ -1,6 +1,7 @@
-"""run_simulation: 경로 엔진(planner) 호출 (B4). 충돌·미완료면 ok=False → 결과를 VR로 보내지 않는다."""
+"""run_simulation: 경로 엔진(planner) 호출 (B4). 충돌, 미완료면 ok=False -> 결과를 VR로 보내지 않는다."""
 from planner import Sim, normalize_scenario
 from planner import run_simulation as _run
+from planner.service import check_log as _check
 
 
 def run_simulation(grid: dict, scenario: dict, orders: list[dict] | None = None,
@@ -15,22 +16,15 @@ def run_simulation(grid: dict, scenario: dict, orders: list[dict] | None = None,
 
 
 def check_log(log: dict) -> dict:
-    """planner.service.run_simulation 과 같은 점검. frames 는 복사해 둔다 (재계획이 Sim.frames 를 잘라내므로)."""
-    log = {**log, "frames": list(log["frames"])}
-    if log["collisions"]:
-        return dict(ok=False, log=log, error=dict(
-            code="COLLISION", message=f"충돌 {len(log['collisions'])}건 (첫 충돌: {log['collisions'][0]})"))
-    if not log["completed"]:
-        rej = [o["order_id"] for o in log["orders"] if o["status"] != "done"]
-        return dict(ok=False, log=log, error=dict(
-            code="INCOMPLETE", message=f"미완료 주문 {len(rej)}건: {rej[:5]} (재고·용량 부족 또는 교착)"))
-    return dict(ok=True, log=log, error=None)
+    """planner.service.check_log 로 점검. frames 는 복사해 둔다 (재계획이 Sim.frames 를 잘라내므로)."""
+    return _check({**log, "frames": list(log["frames"])})
 
 
 def start_simulation(grid: dict, scenario: dict, strategy: str = "optimized", seed: int = 42):
-    """롤링 재계획을 위해 planner.Sim 객체를 함께 돌려준다. 반환: (sim | None, {"ok", "log", "error"})"""
+    """롤링 재계획을 위해 planner.Sim 객체를 함께 돌려준다. 반환: (sim | None, {"ok", "log", "error"})
+    scenario["engine_config"] 가 있으면 엔진 설정으로 넘긴다 (개선안 storage_weight)."""
     try:
-        sim = Sim(grid, normalize_scenario(scenario), strategy, seed)
+        sim = Sim(grid, normalize_scenario(scenario), strategy, seed, scenario.get("engine_config"))
         log = sim.run().result()
     except Exception as e:
         return None, dict(ok=False, log=None, error=dict(code="ENGINE_ERROR", message=f"{type(e).__name__}: {e}"))

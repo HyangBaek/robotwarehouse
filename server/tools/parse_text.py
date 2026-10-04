@@ -1,6 +1,6 @@
 """지시 해석 정규식 대체 경로 (mock_server/mock/parse_text.py 이식).
 
-LLM 호출이 실패(예외·시간 초과·스키마 오류)하면 이 규칙으로 요구사항을 뽑는다 (WS status: regex_fallback).
+LLM 호출이 실패(예외, 시간 초과, 스키마 오류)하면 이 규칙으로 요구사항을 뽑는다 (WS status: regex_fallback).
 출력 키는 LLM 요구사항 스키마(services/interpreter.py)와 같다.
 """
 from __future__ import annotations
@@ -30,9 +30,15 @@ def extract_requirements(text: str) -> dict[str, Any]:
     t = text.replace(" ", " ")
     req: dict[str, Any] = {}
 
-    m = re.search(r"(?:랙|선반)(?:은|는|을|이)?\s*" + _NUM + r"\s*(?:줄|열|개)", t)
-    if m:
+    for m in re.finditer(r"(?:랙|선반)(?:은|는|을|이)?\s*" + _NUM + r"\s*(?:줄|열|개)", t):
+        if "1200" in t[max(0, m.start() - 12):m.start()]:
+            continue                                   # "1200 규격 랙 2줄" 은 규격 랙 수
         req["racks"] = _num(m.group(1))
+        break
+    m = (re.search(r"1200\s*(?:x\s*1000)?\s*(?:규격)?\s*(?:파레트)?\s*(?:랙|선반)?\s*(?:은|는|을)?\s*" + _NUM + r"\s*(?:줄|열)", t)
+         or re.search(_NUM + r"\s*(?:줄|열)(?:은|는|을)?\s*1200", t))
+    if m:
+        req["racks_b"] = _num(m.group(1))
 
     if re.search(r"통로\s*(?:없이|없게|0)", t):
         req["aisle_width"] = 0
@@ -48,19 +54,27 @@ def extract_requirements(text: str) -> dict[str, Any]:
     if m:
         req["dock_out"] = _num(m.group(1))
     m = re.search(r"입하\s*[·,/및와과]?\s*출하(?:\s*도크)?\s*(?:를|는|은)?\s*(?:각각|모두)?\s*" + _NUM + r"\s*개", t)
-    if m:                                                      # "입하·출하 도크 각각 1개씩"
+    if m:                                                      # "입하, 출하 도크 각각 1개씩"
         req["dock_in"] = req["dock_out"] = _num(m.group(1))
     if re.search(r"도크(?:는|를)?\s*(?:빼|없)", t):
         req["dock_in"] = 0
         req["dock_out"] = 0
 
     if "충전" in t:
-        req["charge"] = "left" if "왼" in t else "right"
+        req["charge"] = "left" if re.search(r"왼|서쪽", t) else "right"
+
+    m = re.search(_NUM + r"\s*단", t)
+    if m:
+        req["levels"] = _num(m.group(1))
 
     m = re.search(_NUM + r"\s*구역", t)
     if m:
         req["zones"] = _num(m.group(1))
-    if "일방통행" in t:
+    elif re.search(r"구역(?:은|을|는)?\s*(?:안\s*나|나누지|하나|1개)|한\s*구역", t):
+        req["zones"] = 1
+    if re.search(r"일방통행(?:은|을|는)?\s*(?:없|안|필요\s*없|빼)", t):
+        req["one_way"] = "none"
+    elif "일방통행" in t:
         req["one_way"] = "S" if "남" in t else "N"
 
     if re.search(r"기본값|알아서|아무거나", t):
@@ -79,20 +93,20 @@ def merge_answer(prev: dict[str, Any], answer: str) -> dict[str, Any]:
                 merged[k] = DEFAULTS[k]
         if merged.get("aisle_width", 0) == 0:
             merged["aisle_width"] = DEFAULTS["aisle_width"]
-    # "입하·출하 1개씩", "하나씩 해줘" 같은 표현
+    # "입하, 출하 1개씩", "하나씩 해줘" 같은 표현
     if re.search(r"(?:각각|씩)", answer) and ("도크" in answer or not new):
         m = re.search(_NUM + r"\s*(?:개|곳)?\s*씩", answer) or re.search(_NUM + r"\s*개", answer)
         if m:
             merged["dock_in"] = merged["dock_out"] = _num(m.group(1))
     elif not new:
-        # 숫자만 답한 경우: 비어 있는 항목(도크 0개 → 도크, 통로 0 → 통로 폭)에 넣는다
+        # 숫자만 답한 경우: 비어 있는 항목(도크 0개 -> 도크, 통로 0 -> 통로 폭)에 넣는다
         m = re.search(r"^\D*?" + _NUM_M + r"\s*(?:개|곳|m|미터|M)?", answer.strip())
         if m:
             n = _num(m.group(1))
-            if merged.get("dock_in", 1) == 0 or merged.get("dock_out", 1) == 0:
+            if merged.get("dock_in") in (None, 0) or merged.get("dock_out") in (None, 0):
                 for k in ("dock_in", "dock_out"):
-                    if merged.get(k, 1) == 0:
+                    if merged.get(k) in (None, 0):
                         merged[k] = n
-            elif merged.get("aisle_width", 1) == 0:
+            elif merged.get("aisle_width") in (None, 0):
                 merged["aisle_width"] = n
     return merged

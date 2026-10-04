@@ -142,7 +142,7 @@ QUESTIONS = {
 
 
 def question_for(errors: list[dict[str, Any]]) -> tuple[str, list[list[int]]]:
-    """오류 코드 → 사용자 질문 (템플릿). 문제 칸 좌표도 함께."""
+    """오류 코드 -> 사용자 질문 (템플릿). 문제 칸 좌표도 함께."""
     codes = [e["code"] for e in errors]
     parts = [QUESTIONS[c] for c in dict.fromkeys(codes) if c in QUESTIONS]
     if any(e.get("reason") == "one_way" for e in errors):
@@ -156,3 +156,27 @@ def question_for(errors: list[dict[str, Any]]) -> tuple[str, list[list[int]]]:
         if e["code"] == "UNREACHABLE":
             cells += e.get("cells", [])
     return " ".join(parts), cells
+
+
+# 질문에 바로 누를 수 있는 답 (VR 사용자 패널의 선택 버튼, 최대 3개). label = 버튼 글자, text = 서버로 보낼 답변
+OPTIONS = {
+    "UNREACHABLE": [{"label": "통로 2m", "text": "통로 폭 2m로 해줘"}, {"label": "통로 3m", "text": "통로 폭 3m로 해줘"}],
+    "NO_DOCK_IN": [{"label": "입하 1개", "text": "입하 도크 1개로 해줘"}, {"label": "입하 2개", "text": "입하 도크 2개로 해줘"}],
+    "NO_DOCK_OUT": [{"label": "출하 1개", "text": "출하 도크 1개로 해줘"}, {"label": "출하 2개", "text": "출하 도크 2개로 해줘"}],
+    "SIZE_EXCEEDED": [{"label": "랙 6줄", "text": "랙 6줄로 줄여줘"}, {"label": "랙 4줄", "text": "랙 4줄로 줄여줘"}],
+}
+ONE_WAY_OPTIONS = [{"label": "일방통행 빼기", "text": "일방통행은 없음"}, {"label": "남쪽으로 바꾸기", "text": "가운데 통로는 남쪽 방향 일방통행"}]
+
+
+def options_for(errors: list[dict[str, Any]]) -> list[dict[str, str]]:
+    """검증 오류 -> 선택 버튼."""
+    codes = [e["code"] for e in errors]
+    if any(e.get("reason") == "one_way" for e in errors):
+        return ONE_WAY_OPTIONS
+    if "NO_DOCK_IN" in codes and "NO_DOCK_OUT" in codes:
+        return [{"label": "각각 1개", "text": "입하 도크 1개, 출하 도크 1개로 해줘"},
+                {"label": "각각 2개", "text": "입하 도크 2개, 출하 도크 2개로 해줘"}]
+    for c in dict.fromkeys(codes):
+        if c in OPTIONS:
+            return OPTIONS[c]
+    return []

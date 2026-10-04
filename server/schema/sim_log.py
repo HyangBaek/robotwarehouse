@@ -7,7 +7,7 @@ class RobotPos(BaseModel):
     id: str                       # "R1", "R2", ...
     x: int
     y: int
-    state: str = "idle"           # move_empty / move_loaded / load / unload / wait / idle
+    state: str = "idle"           # 상태값: move_empty(빈 이동), move_loaded(적재 이동), load(적재), unload(하역), wait(대기), idle(유휴)
     task_id: Optional[str] = None
 
 
@@ -20,6 +20,8 @@ class OrderRecord(BaseModel):
     order_id: str
     type: Literal["inbound", "outbound"]
     robot_id: Optional[str] = None
+    spec: str = "pallet_1100x1100"    # 제품 규격 (파레트)
+    qty: int = 1                      # 파레트 수
     arrival_t: int = 0
     assigned_t: Optional[int] = None
     done_t: Optional[int] = None

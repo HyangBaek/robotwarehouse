@@ -10,7 +10,7 @@ def improvement_pct(baseline: float, optimized: float) -> float:
 
 
 def compare_logs(baseline: dict, optimized: dict) -> dict:
-    """같은 지도·주문으로 돌린 두 로그 → VR compare 메시지 본문."""
+    """같은 지도, 주문으로 돌린 두 로그 -> VR compare 메시지 본문."""
     def row(log):
         m = log["meta"]
         return {"총 스텝": log["total_steps"], "주문당 평균": m["avg_order_time"], "대기 합계": m["total_waits"]}
@@ -19,5 +19,5 @@ def compare_logs(baseline: dict, optimized: dict) -> dict:
 
 
 def compare_strategies(grid: dict, scenario: dict, seed: int = 42) -> dict:
-    """기준·최적화를 같은 시드·주문으로 실행 (planner.compare). 반환: {"baseline", "optimized", "summary"}"""
+    """기준, 최적화를 같은 시드, 주문으로 실행 (planner.compare). 반환: {"baseline", "optimized", "summary"}"""
     return _compare(grid, scenario, seed)
