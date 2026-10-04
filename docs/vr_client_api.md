@@ -9,7 +9,7 @@
 | 항목 | 값 | 비고 |
 |---|---|---|
 | REST 기본 주소 | `http://{서버IP}:{포트}` (기본 8000) | 에디터 메뉴 1. 서버 연결 → `Resources/ServerConfig.asset`에 저장, 빌드에 포함 |
-| WebSocket | `ws://{서버IP}:{포트}/ws/{session_id}` | **가정**. 세션별 이벤트 채널 |
+| WebSocket | `ws://{서버IP}:{포트}/ws/{session_id}` | 세션별 이벤트 채널 (실제 서버도 이 경로로 통일) |
 | `session_id` | 앱 실행마다 12자리 무작위 | 모든 POST 본문에 포함 |
 | 상태 확인 | `GET /health` | **가정**. 앱 시작(자동 연결)·다시 연결 때 호출 |
 | 재연결 | WebSocket이 끊기면 5초 간격 재시도 (EX-02) | 재연결 뒤 마지막 `sim_id` 프레임 이어 받기 |
@@ -28,7 +28,7 @@
 | `GET /sim/{id}/frames?from=&to=` | — | `[{t, robots:[{id,x,y,state,task_id}]}]` (`to` 포함, 200개 단위로 요청) | SC-05 |
 | `GET /sim/{id}/stats` | — | `[{x, y, pass, wait}]` | SC-06 |
 | `POST /sim/{id}/event` | `{session_id, t, add_orders, robots}` | `{status}` → WS `sim_ready`(`replan_from`) | SC-08 |
-| `POST /compare` | `{session_id, sim_id}` | `{request_id}` → WS `compare` | SC-07 · 경로 **가정** |
+| `POST /compare` | `{session_id, sim_id}` | `{request_id}` → WS `compare` | SC-07 (실제 서버 구현됨) |
 | `POST /analyze` | `{session_id, sim_id}` | `{request_id}` → WS `analysis` | SC-09 |
 | `POST /improve/approve` | `{session_id, proposal_id}` | `{sim_id}` → WS (`map_ready`) → `sim_ready` | SC-10 |
 
@@ -56,8 +56,8 @@
 
 | state | 색 |
 |---|---|
-| `move`, `moving` | 파랑 |
-| `carry`, `loaded`, `load`, `unload`, `pick`, `drop` | 주황 |
+| `move`, `moving`, `move_empty` | 파랑 |
+| `carry`, `loaded`, `move_loaded`, `load`, `unload`, `pick`, `drop` | 주황 |
 | `wait`, `waiting`, `blocked` | 빨강 (히트맵 `wait` 집계와 같은 의미) |
 | `charge`, `charging` | 초록 |
 | 그 외 (`idle`) | 회색 |
