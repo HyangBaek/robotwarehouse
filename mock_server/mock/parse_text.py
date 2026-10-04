@@ -64,8 +64,8 @@ def extract_requirements(text: str) -> dict[str, Any]:
 def fill_defaults(req: dict[str, Any]) -> tuple[dict[str, Any], list[str]]:
     """누락 항목을 기본값으로 채운다 (SC-12).
 
-    모의 규칙: 랙·통로만 말하고 도크를 말하지 않았으면(W5) 도크를 0으로 두어 검증 실패 → 수정 질문.
-    아무 항목도 없거나(W6) 구역·일방통행·충전처럼 다른 구성을 말했으면(W3) 도크도 기본값으로 채운다.
+    모의 규칙: 랙, 통로만 말하고 도크를 말하지 않았으면(W5) 도크를 0으로 두어 검증 실패 -> 수정 질문.
+    아무 항목도 없거나(W6) 구역, 일방통행, 충전처럼 다른 구성을 말했으면(W3) 도크도 기본값으로 채운다.
     """
     out = dict(req)
     applied: list[str] = []
@@ -102,7 +102,7 @@ def merge_answer(prev: dict[str, Any], answer: str) -> dict[str, Any]:
                 merged[k] = DEFAULTS[k]
         if merged.get("aisle_width", 0) == 0:
             merged["aisle_width"] = DEFAULTS["aisle_width"]
-    # "입하·출하 1개씩" 같은 표현
+    # "입하, 출하 1개씩" 같은 표현
     if re.search(r"(?:각각|씩)", answer) and "도크" in answer:
         m = re.search(_NUM + r"\s*개", answer)
         if m:

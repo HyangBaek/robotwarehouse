@@ -1,7 +1,7 @@
 """로봇웨어하우스 모의 서버 (VR 클라이언트 단독 검증용).
 
-실제 서버(FastAPI + LangGraph + 경로 계산 엔진)와 같은 REST·WebSocket 계약을 흉내 낸다.
-LLM·STT 대신 규칙 기반 해석(mock/parse_text.py)을 쓰고, Agent 노드 진행은 WebSocket `status`로 보낸다.
+실제 서버(FastAPI + LangGraph + 경로 계산 엔진)와 같은 REST, WebSocket 계약을 흉내 낸다.
+LLM, STT 대신 규칙 기반 해석(mock/parse_text.py)을 쓰고, Agent 노드 진행은 WebSocket `status`로 보낸다.
 
 실행:  uvicorn server:app --host 0.0.0.0 --port 8000
 """
@@ -372,7 +372,7 @@ async def compare(body: dict[str, Any]):
     return {"request_id": new_id("REQ")}
 
 
-# ------------------------------------------------------------------ 분석·개선 (SC-09, 10)
+# ------------------------------------------------------------------ 분석, 개선 (SC-09, 10)
 
 def analyze_log(e: SimEntry) -> dict[str, Any]:
     stats = e.log["stats"]

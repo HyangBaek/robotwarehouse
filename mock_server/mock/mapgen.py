@@ -1,8 +1,8 @@
-"""격자 지도 생성 도구 (결정적 함수). 요구사항 → DR-01 격자 지도 JSON.
+"""격자 지도 생성 도구 (결정적 함수). 요구사항 -> DR-01 격자 지도 JSON.
 
 배치 규칙 (모의 서버 기준, 실제 도구와 다를 수 있음)
 - 바깥 둘레는 벽. 랙 줄은 남북 방향(세로)으로 길게, 줄 사이에 통로 폭만큼 통로 칸.
-- 남·북 끝에 가로 통로(폭 = 통로 폭). 입하 도크는 남쪽 벽, 출하 도크는 북쪽 벽.
+- 남, 북 끝에 가로 통로(폭 = 통로 폭). 입하 도크는 남쪽 벽, 출하 도크는 북쪽 벽.
 - 충전 구역은 오른쪽(동쪽) 또는 왼쪽 벽을 따라 한 줄.
 - 두 구역이면 가운데에 넓은 통로(통로 폭 + 1)를 두고, 일방통행이면 그 통로에 rules.one_way.
 """
@@ -68,7 +68,7 @@ def generate_map(req: dict[str, Any]) -> dict[str, Any]:
             elif kind == "charge" and y0 <= y <= y1:
                 cells.append({"x": x, "y": y, "type": "charge"})
             elif kind in ("charge", "rack"):
-                pass  # 가로 통로 구간 → aisle(생략)
+                pass  # 가로 통로 구간 -> aisle(생략)
 
     interior = [x for x in range(1, width - 1) if columns[x] == "aisle"] or list(range(1, width - 1))
     docks: list[dict[str, Any]] = []

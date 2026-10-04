@@ -1,4 +1,4 @@
-"""모의 서버 테스트 — 개발자 테스트 시나리오의 TC 번호를 이름에 붙였다.
+"""모의 서버 테스트 - 개발자 테스트 시나리오의 TC 번호를 이름에 붙였다.
 실행: cd mock_server && pytest -q
 """
 import io
@@ -148,7 +148,7 @@ def test_zero_orders():  # TC-ENG-17
     assert log["orders"] == []
 
 
-# ---------------------------------------------------------------- API (TestClient)
+# ---------------------------------------------------------------- API 흐름 (TestClient 사용)
 
 def _wav(amplitude: float) -> bytes:
     buf = io.BytesIO()

@@ -3,7 +3,7 @@
 simulate(map, scenario, strategy, seed, events) -> log (DR-03)
 - optimized: 보관 위치 선정(도크에 가까운 칸) + 가장 가까운 유휴 로봇 + 가까운 도크 + 시공간 A* 우선순위 계획
 - baseline : 무작위 보관 + 선착순 할당 + 첫 번째 도크 고정 + 같은 충돌 회피 계획(비교 공정성 위해 충돌 0 유지)
-충돌 0건은 예약 테이블(칸·맞교환·정지 로봇 영구 예약)로 보장하고, check_collisions()로 다시 검사한다.
+충돌 0건은 예약 테이블(칸, 맞교환, 정지 로봇 영구 예약)로 보장하고, check_collisions()로 다시 검사한다.
 """
 from __future__ import annotations
 
@@ -24,7 +24,7 @@ ARRIVAL_INTERVAL = 2
 @dataclass
 class Order:
     order_id: str
-    kind: str  # inbound / outbound
+    kind: str  # 주문 유형: inbound(입하) 또는 outbound(출하)
     spec: str
     arrival: int
     robot_id: str | None = None
@@ -38,7 +38,7 @@ class Robot:
     rid: str
     pos: tuple[int, int]
     free_at: int = 0                     # 이 시각부터 새 계획 가능
-    legs: deque = field(default_factory=deque)  # (goal, work_state, loaded_while_moving, order)
+    legs: deque = field(default_factory=deque)  # 구간 정보: (목표 칸, 작업 상태, 적재 이동 여부, 주문)
     order: Order | None = None
     parked: bool = False
     fails: int = 0
@@ -192,7 +192,7 @@ class Sim:
             return None
         p = self.perm.get(goal)
         if p is not None and p[0] != rid:
-            return None  # 목표 칸에 다른 로봇이 서 있음 → 다음 스텝에 다시 시도
+            return None  # 목표 칸에 다른 로봇이 서 있음 -> 다음 스텝에 다시 시도
         busy_until = max([v for who, v in self.cell_last.get(goal, {}).items() if who != rid] + [t0])
         horizon = max(t0 + 2 * h[start] + 40, busy_until + h[start] + 20)
         openq = [(h[start], 0, start, t0)]
@@ -496,7 +496,7 @@ def simulate(m, scenario, strategy="optimized", seed=42, events=None):
 
 
 def check_collisions(frames) -> list[dict[str, Any]]:
-    """같은 칸·같은 스텝, 맞교환 충돌 검사 (NFR-04)."""
+    """같은 칸, 같은 스텝, 맞교환 충돌 검사 (NFR-04)."""
     out = []
     for f in frames:
         seen: dict = {}

@@ -100,7 +100,7 @@ QUESTIONS = {
 
 
 def question_for(errors: list[dict[str, Any]]) -> tuple[str, list[list[int]]]:
-    """오류 코드 → 사용자 질문 (LLM 대신 템플릿). 문제 칸 좌표도 함께."""
+    """오류 코드 -> 사용자 질문 (LLM 대신 템플릿). 문제 칸 좌표도 함께."""
     codes = [e["code"] for e in errors]
     parts = [QUESTIONS[c] for c in dict.fromkeys(codes) if c in QUESTIONS]
     if "NO_DOCK_IN" in codes and "NO_DOCK_OUT" in codes:
@@ -123,7 +123,7 @@ OPTIONS = {
 
 
 def options_for(errors: list[dict[str, Any]]) -> list[dict[str, str]]:
-    """오류 코드 → 선택 버튼 (최대 3개)."""
+    """오류 코드 -> 선택 버튼 (최대 3개)."""
     codes = [e["code"] for e in errors]
     if "NO_DOCK_IN" in codes and "NO_DOCK_OUT" in codes:
         return [{"label": "각각 1개", "text": "입하 도크 1개, 출하 도크 1개로 해줘"},
