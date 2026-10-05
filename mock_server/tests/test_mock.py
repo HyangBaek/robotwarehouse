@@ -239,6 +239,7 @@ def test_api_voice_stt_only(client):  # 사용자 UI: 인식 결과 확인 후 �
                     files={"audio": ("v.wav", _wav(0.3), "audio/wav")})
         msg = recv_until(ws, "transcript")
         assert msg["text"] and msg["stt_only"] is True
+        assert msg["recognized"] is False          # 모의 STT 는 실제 인식이 아님을 알린다
 
 
 def test_question_has_options(client):

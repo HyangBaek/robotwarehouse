@@ -58,8 +58,30 @@ class WhisperSTT:
         with self._lock:                                 # 모델 1개를 여러 요청이 동시에 쓰지 않게
             segments, _ = model.transcribe(self._decode(audio), language="ko", vad_filter=True,
                                            beam_size=5, initial_prompt=INITIAL_PROMPT)
-            text = " ".join(s.text.strip() for s in segments)   # 제너레이터: 순회해야 인식이 실행됨
-        return text.strip()
+            # 제너레이터: 순회해야 인식이 실행됨. 말소리가 아니라고 본 구간은 버린다
+            parts = [s.text.strip() for s in segments if not is_non_speech(s)]
+        return clean_transcript(" ".join(parts))
+
+
+# Whisper 가 무음, 잡음에서 지어내는 자막식 문장 (한국어 학습 데이터 영향). 이것만 나오면 인식 실패로 본다
+HALLUCINATIONS = ("시청해 주셔서 감사합니다", "시청해주셔서 감사합니다", "구독과 좋아요", "구독 좋아요", "감사합니다",
+                  "고맙습니다", "MBC 뉴스", "자막 제공", "다음 영상에서 만나요")
+
+
+def is_non_speech(seg) -> bool:
+    """Whisper 기준(no_speech_prob > 0.6 이고 평균 log 확률 < -1)으로 말소리가 아닌 구간."""
+    return getattr(seg, "no_speech_prob", 0.0) > 0.6 and getattr(seg, "avg_logprob", 0.0) < -1.0
+
+
+def clean_transcript(text: str) -> str:
+    """지어낸 문장만 남았으면 "" (VR 이 '인식하지 못했어요' 와 기본 창고 설정을 보여 줌)."""
+    t = text.strip()
+    core = t.strip(" .,!?~").replace(" ", "")
+    if not core or any(core == h.replace(" ", "") for h in HALLUCINATIONS):
+        return ""
+    if INITIAL_PROMPT.replace(" ", "") in t.replace(" ", ""):   # 안내 단어 목록을 그대로 따라 읽은 경우
+        return ""
+    return t
 
 
 def make_stt():

@@ -213,7 +213,8 @@ async def map_voice(session_id: str = Form("default"), audio: UploadFile = File(
             await emit(s, {"type": "error", "code": "STT_EMPTY", "message": "잘 못 들었어요. 다시 말하거나 입력해 주세요"})
             return
         text = MOCK_STT_ANSWER if question_id else MOCK_STT_TEXT
-        await emit(s, {"type": "transcript", "text": text, "stt_only": stt_only})
+        # 모의 서버는 음성을 실제로 인식하지 않는다. recognized=false 로 알려 VR 이 인식 결과처럼 보여 주지 않게 한다
+        await emit(s, {"type": "transcript", "text": text, "stt_only": stt_only, "recognized": False})
         if stt_only:
             return  # VR이 인식 결과를 사용자에게 확인받은 뒤 /map/text 또는 /map/answer 로 다시 보낸다
         if question_id and s.question_id == question_id:

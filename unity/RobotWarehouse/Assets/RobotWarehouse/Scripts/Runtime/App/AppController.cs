@@ -823,6 +823,29 @@ namespace RobotWarehouse.App
             }, answer ? _questionId : null, sttOnly: true));
         }
 
+        /// <summary>음성 인식 실패 시 대신 보여 줄 기본 창고 설정 (서버 DEFAULTS 와 같은 값, 필수 정보 8개를 모두 담아 되묻지 않음).</summary>
+        public const string DefaultWarehouseText = "랙 6줄 3단, 통로 폭 3m, 입하 도크 1개, 출하 도크 1개, 충전은 오른쪽, 구역은 하나";
+        public const string DefaultAnswerText = "나머지는 기본값으로 해줘";
+
+        /// <summary>
+        /// 인식 실패를 숨기지 않고 알린 뒤, 인식 결과 확인 화면에 기본 창고 설정(질문 답변이면 '기본값으로')을 채워 보여 준다.
+        /// 사용자는 다시 말하기 / 고쳐 쓰기 / 기본값으로 생성하기 중에서 고른다.
+        /// </summary>
+        void ShowSttFallback(bool answer, string reason)
+        {
+            _work = Work.None;
+            _lastTranscript = answer ? DefaultAnswerText : DefaultWarehouseText;
+            Log(LogLevel.Warn, LogModule.Agent, $"{reason} -> 기본값 제안: \"{_lastTranscript}\"");
+            _user.Toast(reason + ". 기본 설정을 보여 드릴게요", ToastKind.Warning, 5f);
+            FinishProcessing(() =>
+            {
+                _user.SttLabel.text = $"<color={UIFactory.Hex(UIFactory.Warning)}>{reason}</color>  ·  " + (answer ? "기본값으로 답하기" : "기본 창고 설정");
+                _user.SttText.text = $"“{_lastTranscript}”";
+                UIFactory.SetButtonText(_user.SttSubmit, answer ? "기본값으로 답하기" : "기본값으로 생성하기");
+                _user.Show(UserScreen.SttResult, answer ? 2 : 1, "음성을 인식하지 못했어요");
+            }, 0.3f, failed: true);
+        }
+
         void OnTranscript(ServerMessage msg)
         {
             var text = msg.GetString("text");
@@ -842,9 +865,14 @@ namespace RobotWarehouse.App
             bool answer = _voiceTarget == VoiceTarget.Answer && !string.IsNullOrEmpty(_questionId);
             if (string.IsNullOrWhiteSpace(text))
             {
-                _work = Work.None;
-                _user.Toast("잘 못 들었어요. 다시 말하거나 직접 입력해 주세요", ToastKind.Warning);   // EX-03
-                if (answer) GoQuestion(); else GoCreate();
+                ShowSttFallback(answer, "음성을 인식하지 못했어요");   // EX-03
+                return;
+            }
+            // 모의 서버처럼 실제로 인식하지 않은 문장(recognized=false)은 인식 결과로 보여 주지 않는다
+            var recognized = msg.Get("recognized");
+            if (recognized != null && recognized.Type == JTokenType.Boolean && !(bool)recognized)
+            {
+                ShowSttFallback(answer, "음성을 인식하지 못했어요 (모의 서버는 음성 인식을 하지 않아요)");
                 return;
             }
             _lastTranscript = text.Trim();
@@ -1063,12 +1091,20 @@ namespace RobotWarehouse.App
             switch (code)
             {
                 case "STT_EMPTY":
+                case "STT_ERROR":
+                case "STT_UNAVAILABLE":
                     // 보통 빈 transcript가 먼저 와서 이미 안내했지만, 오류만 오는 서버도 있으므로
                     if (_user.Current == UserScreen.Processing && _work == Work.Stt)
                     {
-                        _work = Work.None;
-                        _user.Toast("잘 못 들었어요. 다시 말하거나 직접 입력해 주세요", ToastKind.Warning);
-                        if (_voiceTarget == VoiceTarget.Answer && !string.IsNullOrEmpty(_questionId)) GoQuestion(); else GoCreate();
+                        if (_voiceTarget == VoiceTarget.Scenario)
+                        {
+                            _work = Work.None;
+                            _user.Toast("잘 못 들었어요. 다시 말하거나 -/+ 로 정해 주세요", ToastKind.Warning);
+                            GoSimConfig();
+                        }
+                        else
+                            ShowSttFallback(_voiceTarget == VoiceTarget.Answer && !string.IsNullOrEmpty(_questionId),
+                                code == "STT_EMPTY" ? "음성을 인식하지 못했어요" : "음성 인식기를 쓸 수 없어요");
                     }
                     return;
                 case "QUESTION_LIMIT":
