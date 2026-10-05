@@ -260,7 +260,7 @@ namespace RobotWarehouse.App
             PlacePanels();
             _report = new ReportPanel();
             _report.Build(null);
-            // 리포트는 사용자 패널 자리에 대신 열린다 → 닫으면 사용자 패널을 다시 보인다 (창 겹침 방지)
+            // 리포트는 사용자 패널 자리에 대신 열린다 -> 닫으면 사용자 패널을 다시 보인다 (창 겹침 방지)
             _report.OnClosed += () => { if (!_adminMode) _user.Canvas.gameObject.SetActive(true); };
             _history = new HistoryPanel();
             _history.Build(null);
@@ -1032,7 +1032,7 @@ namespace RobotWarehouse.App
             Post(ApiRoutes.ImproveApprove, new { session_id = AppConfig.SessionId, proposal_id = p.proposalId }, r =>
             {
                 Log(LogLevel.Info, LogModule.Agent, $"개선안 적용: {p.text} → 재시뮬레이션");
-                // 로봇 대수 개선안이면 설정 화면 값도 맞춘다 ("로봇 6대 → 4대" 형식, 가정)
+                // 로봇 대수 개선안이면 설정 화면 값도 맞춘다 ("로봇 6대 -> 4대" 형식, 가정)
                 var m = Regex.Match(p.text ?? "", @"→\s*(\d+)\s*대");
                 if (p.type == "robot_count" && m.Success) _user.Robots.Value = int.Parse(m.Groups[1].Value);
             }, null, () => ApproveProposal(p));
@@ -1409,7 +1409,7 @@ namespace RobotWarehouse.App
             {
                 if (r.Ok) return;
                 Log(LogLevel.Warn, LogModule.Api, $"POST /report 실패: {r.ErrorMessage}", r.TimedOut ? "TIMEOUT" : $"HTTP_{r.Status}", null, r.Text);
-                // 사용자가 리포트를 기다리는 중이면 알린다 (예: /report 가 없는 예전 모의 서버 → 404)
+                // 사용자가 리포트를 기다리는 중이면 알린다 (예: /report 가 없는 예전 모의 서버 -> 404)
                 if (_showReportWhenReady && simId == _simId)
                 {
                     _showReportWhenReady = false;
@@ -1484,7 +1484,7 @@ namespace RobotWarehouse.App
             _reportShownFor = _reportSimId;
         }
 
-        /// <summary>사용자 패널과 같은 자리·방향 (둘 다 아래 가장자리 기준)에 놓는다.</summary>
+        /// <summary>사용자 패널과 같은 자리, 방향 (둘 다 아래 가장자리 기준)에 놓는다.</summary>
         void PlaceAtUserPanel(Canvas canvas)
         {
             var u = _user.Canvas.transform;
@@ -1969,7 +1969,7 @@ namespace RobotWarehouse.App
                 if (_history?.Canvas != null) XRSupport.RefreshRaycasters(_history.Canvas);
             }
 
-            // 오른손 A 버튼: 누른 채 말하기 (창고 만들기·인식 결과·질문 화면). 녹음 화면에서 누르면 녹음 종료.
+            // 오른손 A 버튼: 누른 채 말하기 (창고 만들기, 인식 결과, 질문 화면). 녹음 화면에서 누르면 녹음 종료.
             bool a = XRSupport.RightButton(UnityEngine.XR.CommonUsages.primaryButton) && !_adminMode;
             if (a && !_prevA)
             {
@@ -1991,7 +1991,7 @@ namespace RobotWarehouse.App
             }
             _prevA = a;
 
-            // 관리자 메뉴 비밀 입력 (왼손 그립 + Y 3번) → 사용자 패널에 ≡ 버튼이 잠깐 나타남
+            // 관리자 메뉴 비밀 입력 (왼손 그립 + Y 3번) -> 사용자 패널에 = 버튼이 잠깐 나타남
             TickAdminGesture();
 
             // 오른손 B 버튼: 미니어처 보기면 테이블 앞으로 다시 맞춤, 실물 보기면 패널만 지금 위치 기준으로

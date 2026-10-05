@@ -29,7 +29,7 @@ def _improve(base: float | None, opt: float | None, lower_is_better: bool = True
     return round(d if lower_is_better else -d, 1)
 
 
-# 모의 엔진 상태 → 실제 서버 상태 이름
+# 모의 엔진 상태 -> 실제 서버 상태 이름
 _STATE_MAP = {"carry": "move_loaded", "move": "move_empty", "load": "load", "unload": "unload",
               "wait": "wait", "idle": "idle", "charge": "idle"}
 

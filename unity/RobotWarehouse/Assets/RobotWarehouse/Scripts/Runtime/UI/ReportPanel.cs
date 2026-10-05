@@ -10,13 +10,13 @@ namespace RobotWarehouse.UI
 {
     /// <summary>
     /// 최종 시뮬레이션 리포트 창 (서버 WS "report", FR-25 집계 + FR-28 기준 전략 비교).
-    /// 사용자 패널과 같은 틀: 머리글(제목 · 정보) / 구분선 / 탭 / 내용 / 구분선 / 바닥(안내 · 닫기).
+    /// 사용자 패널과 같은 틀: 머리글(제목, 정보) / 구분선 / 탭 / 내용 / 구분선 / 바닥(안내, 닫기).
     /// 사용자 패널 자리에 대신 열리고(AppController), 닫으면 사용자 패널이 다시 보인다 (창 겹침 방지).
     /// 숫자는 모두 서버(tools/report.py)가 계산한 값을 그대로 보여 준다.
     /// </summary>
     public class ReportPanel
     {
-        public const float Width = 1400f, Height = 1060f, MetersPerPixel = 0.0009f;   // 1.26m × 0.95m
+        public const float Width = 1400f, Height = 1060f, MetersPerPixel = 0.0009f;   // 1.26m x 0.95m
 
         public Canvas Canvas;
         public bool Visible => Canvas != null && Canvas.gameObject.activeSelf;
@@ -41,7 +41,7 @@ namespace RobotWarehouse.UI
             ((RectTransform)Canvas.transform).pivot = new Vector2(0.5f, 0f);   // 사용자 패널처럼 아래 가장자리 기준
             var root = Canvas.transform;
 
-            // 머리글: 배지 · 제목 | 시나리오 정보
+            // 머리글: 배지, 제목 | 시나리오 정보
             var head = UIFactory.Row(root, 76, 18, false);
             UIFactory.Badge(head, 54, "R", UIFactory.Primary, false, UIFactory.FontBody);
             var title = UIFactory.Label(head, "시뮬레이션 리포트", UIFactory.FontTitle, UIFactory.TextMain);
@@ -224,7 +224,7 @@ namespace RobotWarehouse.UI
             UIFactory.Label(chartCard, Legend(("최적화", ColEmpty), ("기준 전략", ColBase)) +
                 $"      0 ~ {tMax:0} 스텝 · 0 ~ {yMax:0} 건", UIFactory.FontSmall - 4, UIFactory.TextDim);
 
-            // 처리 시간 통계 (2열 × 3줄)
+            // 처리 시간 통계 (2열 x 3줄)
             var stats = new GameObject("Stats", typeof(RectTransform));
             stats.transform.SetParent(top, false);
             var sg = stats.AddComponent<GridLayoutGroup>();
