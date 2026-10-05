@@ -38,7 +38,7 @@
 | type | 필드 |
 |---|---|
 | status | {node, message} — Agent 진행 단계 (STT, 지시 해석 (gpt-oss:20b), regex_fallback, 격자 지도 생성, 지도 검증, 수정 질문, 시뮬레이션 실행, 로그 분석, 비교 리포트, 롤링 재계획, 개선안 제안) |
-| transcript | {text} |
+| transcript | {text, stt_only?, recognized?} — 무음이거나 Whisper 가 지어낸 문장("시청해 주셔서 감사합니다" 등)만 나오면 text 는 "" 와 STT_EMPTY. 모의 서버는 recognized=false |
 | map_ready | {map_version, map, summary, defaults_applied[], confirmed?, scenario_defaults?{robots, inbound, outbound, basis}} |
 | question | {question_id, text, error_cells[[x, y]], errors[], map?, missing?[]} — 필수 정보 누락이면 errors=["MISSING_INFO"], missing=빠진 키, map 없음 |
 | scenario | {map_version, robots, inbound, outbound, run, changed[], basis} — 시나리오 문장·음성 해석 결과. VR은 패널 값에 반영하고 run이면 실행 |

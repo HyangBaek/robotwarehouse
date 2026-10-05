@@ -1,0 +1,173 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1600" height="1080" viewBox="0 0 1600 1080">
+<defs>
+<marker id="a" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" fill="#8C959F"/></marker>
+<marker id="as" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" fill="#8C959F"/></marker>
+<marker id="b" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" fill="#1F5FBF"/></marker>
+<marker id="bs" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" fill="#1F5FBF"/></marker>
+<marker id="t" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" fill="#0E7C66"/></marker>
+<marker id="ts" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" fill="#0E7C66"/></marker>
+</defs>
+<rect width="1600" height="1080" fill="#FFFFFF"/>
+<text x="20" y="38" font-family="Noto Sans CJK KR" font-size="24" font-weight="700" fill="#1F2328" text-anchor="start">로봇웨어하우스 시스템 아키텍처</text>
+<text x="20" y="60" font-family="Noto Sans CJK KR" font-size="14" font-weight="400" fill="#57606A" text-anchor="start">자연어 기반 디지털 트윈과 다중 로봇 동선 최적화·분석 VR 피지컬 AI Agent</text>
+<rect x="20" y="76" width="1560" height="196" rx="10" fill="#F6F7F9" stroke="#D0D7DE" stroke-width="1.2"/>
+<text x="36" y="98" font-family="Noto Sans CJK KR" font-size="13" font-weight="700" fill="#57606A" text-anchor="start">① 디바이스 계층</text>
+<rect x="40" y="112" width="150" height="145" rx="6" fill="#FFFFFF" stroke="#57606A" stroke-width="1.2"/>
+<text x="115.0" y="172.5" font-family="Noto Sans CJK KR" font-size="15" font-weight="700" fill="#57606A" text-anchor="middle">사용자</text>
+<text x="115.0" y="193.5" font-family="Noto Sans CJK KR" font-size="12.5" font-weight="400" fill="#57606A" text-anchor="middle">창고 운영·기획 담당자</text>
+<text x="115.0" y="210.5" font-family="Noto Sans CJK KR" font-size="12.5" font-weight="400" fill="#57606A" text-anchor="middle">음성 · 컨트롤러</text>
+<path d="M190,184 L228,184" fill="none" stroke="#1F5FBF" stroke-width="1.8" marker-end="url(#b)"/>
+<rect x="232" y="104" width="1330" height="158" rx="8" fill="#EAF1FD" stroke="#1F5FBF" stroke-width="1.5"/>
+<text x="248" y="128" font-family="Noto Sans CJK KR" font-size="16" font-weight="700" fill="#1F5FBF" text-anchor="start">Meta Quest 2 · VR 클라이언트</text>
+<text x="488" y="128" font-family="Noto Sans CJK KR" font-size="13" font-weight="400" fill="#57606A" text-anchor="start">Unity · C# · Meta XR SDK</text>
+<rect x="248" y="142" width="205" height="104" rx="6" fill="#FFFFFF" stroke="#1F5FBF" stroke-width="1.2"/>
+<text x="350.5" y="182.0" font-family="Noto Sans CJK KR" font-size="14" font-weight="700" fill="#1F5FBF" text-anchor="middle">입력 모듈</text>
+<text x="350.5" y="203.0" font-family="Noto Sans CJK KR" font-size="12" font-weight="400" fill="#57606A" text-anchor="middle">음성 녹음 · VR 입력 패널</text>
+<text x="350.5" y="220.0" font-family="Noto Sans CJK KR" font-size="12" font-weight="400" fill="#57606A" text-anchor="middle">랙 잡아 옮기기</text>
+<rect x="465" y="142" width="205" height="104" rx="6" fill="#FFFFFF" stroke="#1F5FBF" stroke-width="1.2"/>
+<text x="567.5" y="182.0" font-family="Noto Sans CJK KR" font-size="14" font-weight="700" fill="#1F5FBF" text-anchor="middle">창고 렌더러</text>
+<text x="567.5" y="203.0" font-family="Noto Sans CJK KR" font-size="12" font-weight="400" fill="#57606A" text-anchor="middle">격자 지도 → 3D 블록</text>
+<text x="567.5" y="220.0" font-family="Noto Sans CJK KR" font-size="12" font-weight="400" fill="#57606A" text-anchor="middle">인스턴싱 렌더링</text>
+<rect x="682" y="142" width="205" height="104" rx="6" fill="#FFFFFF" stroke="#1F5FBF" stroke-width="1.2"/>
+<text x="784.5" y="182.0" font-family="Noto Sans CJK KR" font-size="14" font-weight="700" fill="#1F5FBF" text-anchor="middle">로봇 재생기</text>
+<text x="784.5" y="203.0" font-family="Noto Sans CJK KR" font-size="12" font-weight="400" fill="#57606A" text-anchor="middle">시간 단계별 이동 재생</text>
+<text x="784.5" y="220.0" font-family="Noto Sans CJK KR" font-size="12" font-weight="400" fill="#57606A" text-anchor="middle">배속 · 경로 선 토글</text>
+<rect x="899" y="142" width="205" height="104" rx="6" fill="#FFFFFF" stroke="#1F5FBF" stroke-width="1.2"/>
+<text x="1001.5" y="182.0" font-family="Noto Sans CJK KR" font-size="14" font-weight="700" fill="#1F5FBF" text-anchor="middle">히트맵 레이어</text>
+<text x="1001.5" y="203.0" font-family="Noto Sans CJK KR" font-size="12" font-weight="400" fill="#57606A" text-anchor="middle">칸별 통과·대기 집계</text>
+<text x="1001.5" y="220.0" font-family="Noto Sans CJK KR" font-size="12" font-weight="400" fill="#57606A" text-anchor="middle">바닥 텍스처 색상</text>
+<rect x="1116" y="142" width="205" height="104" rx="6" fill="#FFFFFF" stroke="#1F5FBF" stroke-width="1.2"/>
+<text x="1218.5" y="182.0" font-family="Noto Sans CJK KR" font-size="14" font-weight="700" fill="#1F5FBF" text-anchor="middle">결과 패널</text>
+<text x="1218.5" y="203.0" font-family="Noto Sans CJK KR" font-size="12" font-weight="400" fill="#57606A" text-anchor="middle">수정 질문 · 개선안 표시</text>
+<text x="1218.5" y="220.0" font-family="Noto Sans CJK KR" font-size="12" font-weight="400" fill="#57606A" text-anchor="middle">사용자 승인 · TTS 재생</text>
+<rect x="1333" y="142" width="205" height="104" rx="6" fill="#FFFFFF" stroke="#1F5FBF" stroke-width="1.2"/>
+<text x="1435.5" y="182.0" font-family="Noto Sans CJK KR" font-size="14" font-weight="700" fill="#1F5FBF" text-anchor="middle">API 클라이언트</text>
+<text x="1435.5" y="203.0" font-family="Noto Sans CJK KR" font-size="12" font-weight="400" fill="#57606A" text-anchor="middle">REST 요청</text>
+<text x="1435.5" y="220.0" font-family="Noto Sans CJK KR" font-size="12" font-weight="400" fill="#57606A" text-anchor="middle">WebSocket 수신</text>
+<path d="M430,264 L430,331" fill="none" stroke="#1F5FBF" stroke-width="2" marker-end="url(#b)"/>
+<text x="442" y="300" font-family="Noto Sans CJK KR" font-size="13" font-weight="700" fill="#1F5FBF" text-anchor="start">REST (HTTP · JSON)</text>
+<text x="442" y="318" font-family="Noto Sans CJK KR" font-size="12" font-weight="400" fill="#57606A" text-anchor="start">창고 설명 음성·텍스트, 시나리오, 승인</text>
+<path d="M860,334 L860,264" fill="none" stroke="#1F5FBF" stroke-width="2" marker-end="url(#b)"/>
+<text x="872" y="300" font-family="Noto Sans CJK KR" font-size="13" font-weight="700" fill="#1F5FBF" text-anchor="start">WebSocket 스트림</text>
+<text x="872" y="318" font-family="Noto Sans CJK KR" font-size="12" font-weight="400" fill="#57606A" text-anchor="start">지도 JSON, 로봇 위치 프레임, 히트맵·분석 결과</text>
+<text x="1260" y="312" font-family="Noto Sans CJK KR" font-size="12" font-weight="400" fill="#57606A" text-anchor="start">Quest 2 ↔ 서버 노트북: 동일 Wi-Fi</text>
+<rect x="20" y="334" width="1140" height="438" rx="10" fill="#F6F7F9" stroke="#D0D7DE" stroke-width="1.2"/>
+<text x="36" y="356" font-family="Noto Sans CJK KR" font-size="13" font-weight="700" fill="#57606A" text-anchor="start">② 에이전트 서버 계층 · 팀 노트북 (Python)</text>
+<rect x="40" y="368" width="1100" height="44" rx="6" fill="#FFFFFF" stroke="#0E7C66" stroke-width="1.4"/>
+<text x="590" y="396" font-family="Noto Sans CJK KR" font-size="14" font-weight="700" fill="#0E7C66" text-anchor="middle">API 게이트웨이 (FastAPI)  ·  요청 라우팅 · 세션 관리 · 프레임 스트리밍</text>
+<rect x="40" y="424" width="1100" height="184" rx="8" fill="#E6F4F0" stroke="#0E7C66" stroke-width="1.5"/>
+<text x="56" y="447" font-family="Noto Sans CJK KR" font-size="15" font-weight="700" fill="#0E7C66" text-anchor="start">Agent 오케스트레이터</text>
+<text x="226" y="447" font-family="Noto Sans CJK KR" font-size="13" font-weight="400" fill="#57606A" text-anchor="start">LangGraph 상태 그래프</text>
+<rect x="56" y="462" width="145" height="64" rx="6" fill="#FFFFFF" stroke="#0E7C66" stroke-width="1.2"/>
+<text x="128.5" y="490" font-family="Noto Sans CJK KR" font-size="14" font-weight="700" fill="#1F2328" text-anchor="middle">지시 해석</text>
+<text x="128.5" y="510" font-family="Noto Sans CJK KR" font-size="12" font-weight="400" fill="#57606A" text-anchor="middle">LLM</text>
+<path d="M203,494.0 L235,494.0" fill="none" stroke="#0E7C66" stroke-width="1.6" marker-end="url(#t)"/>
+<rect x="237" y="462" width="145" height="64" rx="6" fill="#FFFFFF" stroke="#0E7C66" stroke-width="1.2"/>
+<text x="309.5" y="490" font-family="Noto Sans CJK KR" font-size="14" font-weight="700" fill="#1F2328" text-anchor="middle">격자 지도 생성</text>
+<text x="309.5" y="510" font-family="Noto Sans CJK KR" font-size="12" font-weight="400" fill="#57606A" text-anchor="middle">도구 호출</text>
+<path d="M384,494.0 L416,494.0" fill="none" stroke="#0E7C66" stroke-width="1.6" marker-end="url(#t)"/>
+<rect x="418" y="462" width="145" height="64" rx="6" fill="#FFFFFF" stroke="#0E7C66" stroke-width="1.2"/>
+<text x="490.5" y="490" font-family="Noto Sans CJK KR" font-size="14" font-weight="700" fill="#1F2328" text-anchor="middle">지도 검증</text>
+<text x="490.5" y="510" font-family="Noto Sans CJK KR" font-size="12" font-weight="400" fill="#57606A" text-anchor="middle">도구 + LLM</text>
+<path d="M565,494.0 L597,494.0" fill="none" stroke="#0E7C66" stroke-width="1.6" marker-end="url(#t)"/>
+<rect x="599" y="462" width="145" height="64" rx="6" fill="#FFFFFF" stroke="#0E7C66" stroke-width="1.2"/>
+<text x="671.5" y="490" font-family="Noto Sans CJK KR" font-size="14" font-weight="700" fill="#1F2328" text-anchor="middle">시뮬레이션 실행</text>
+<text x="671.5" y="510" font-family="Noto Sans CJK KR" font-size="12" font-weight="400" fill="#57606A" text-anchor="middle">도구 호출</text>
+<path d="M746,494.0 L778,494.0" fill="none" stroke="#0E7C66" stroke-width="1.6" marker-end="url(#t)"/>
+<rect x="780" y="462" width="145" height="64" rx="6" fill="#FFFFFF" stroke="#0E7C66" stroke-width="1.2"/>
+<text x="852.5" y="490" font-family="Noto Sans CJK KR" font-size="14" font-weight="700" fill="#1F2328" text-anchor="middle">로그 분석</text>
+<text x="852.5" y="510" font-family="Noto Sans CJK KR" font-size="12" font-weight="400" fill="#57606A" text-anchor="middle">도구 + LLM</text>
+<path d="M927,494.0 L959,494.0" fill="none" stroke="#0E7C66" stroke-width="1.6" marker-end="url(#t)"/>
+<rect x="961" y="462" width="145" height="64" rx="6" fill="#FFFFFF" stroke="#0E7C66" stroke-width="1.2"/>
+<text x="1033.5" y="490" font-family="Noto Sans CJK KR" font-size="14" font-weight="700" fill="#1F2328" text-anchor="middle">개선안 제안</text>
+<text x="1033.5" y="510" font-family="Noto Sans CJK KR" font-size="12" font-weight="400" fill="#57606A" text-anchor="middle">LLM</text>
+<path d="M490.5,526 L490.5,548 L128.5,548 L128.5,529" fill="none" stroke="#0E7C66" stroke-width="1.4" stroke-dasharray="5 4" marker-end="url(#t)"/>
+<text x="309.5" y="564" font-family="Noto Sans CJK KR" font-size="12" font-weight="400" fill="#0E7C66" text-anchor="middle">검증 실패 → 사용자에게 수정 질문</text>
+<path d="M1033.5,526 L1033.5,548 L671.5,548 L671.5,529" fill="none" stroke="#0E7C66" stroke-width="1.4" stroke-dasharray="5 4" marker-end="url(#t)"/>
+<text x="852.5" y="564" font-family="Noto Sans CJK KR" font-size="12" font-weight="400" fill="#0E7C66" text-anchor="middle">사용자 승인 시 재시뮬레이션 · 기준 전략과 비교</text>
+<text x="590" y="598" font-family="Noto Sans CJK KR" font-size="12" font-weight="400" fill="#57606A" text-anchor="middle">공유 상태(State): 대화 이력 · 지도 버전 · 시나리오 · 분석 결과</text>
+<path d="M590,610 L590,636" fill="none" stroke="#0E7C66" stroke-width="1.8" marker-end="url(#t)" marker-start="url(#ts)"/>
+<text x="602" y="628" font-family="Noto Sans CJK KR" font-size="12" font-weight="400" fill="#0E7C66" text-anchor="start">도구 호출 / 결과 반환</text>
+<rect x="40" y="640" width="1100" height="120" rx="8" fill="#FFFFFF" stroke="#0E7C66" stroke-width="1.5"/>
+<text x="56" y="662" font-family="Noto Sans CJK KR" font-size="15" font-weight="700" fill="#0E7C66" text-anchor="start">도구 계층 (Tool)</text>
+<rect x="56" y="674" width="200" height="72" rx="6" fill="#E6F4F0" stroke="#0E7C66" stroke-width="1.2"/>
+<text x="156.0" y="706.5" font-family="Noto Sans CJK KR" font-size="14" font-weight="700" fill="#0E7C66" text-anchor="middle">격자 지도 생성</text>
+<text x="156.0" y="727.5" font-family="Noto Sans CJK KR" font-size="12" font-weight="400" fill="#57606A" text-anchor="middle">요구사항 → 격자 지도 JSON</text>
+<rect x="271" y="674" width="200" height="72" rx="6" fill="#E6F4F0" stroke="#0E7C66" stroke-width="1.2"/>
+<text x="371.0" y="706.5" font-family="Noto Sans CJK KR" font-size="14" font-weight="700" fill="#0E7C66" text-anchor="middle">지도 검증</text>
+<text x="371.0" y="727.5" font-family="Noto Sans CJK KR" font-size="12" font-weight="400" fill="#57606A" text-anchor="middle">스키마 · 도달 가능성 검사</text>
+<rect x="486" y="674" width="200" height="72" rx="6" fill="#E6F4F0" stroke="#0E7C66" stroke-width="1.2"/>
+<text x="586.0" y="706.5" font-family="Noto Sans CJK KR" font-size="14" font-weight="700" fill="#0E7C66" text-anchor="middle">시뮬레이션 실행</text>
+<text x="586.0" y="727.5" font-family="Noto Sans CJK KR" font-size="12" font-weight="400" fill="#57606A" text-anchor="middle">경로 계산 엔진 호출</text>
+<rect x="701" y="674" width="200" height="72" rx="6" fill="#E6F4F0" stroke="#0E7C66" stroke-width="1.2"/>
+<text x="801.0" y="706.5" font-family="Noto Sans CJK KR" font-size="14" font-weight="700" fill="#0E7C66" text-anchor="middle">로그 집계</text>
+<text x="801.0" y="727.5" font-family="Noto Sans CJK KR" font-size="12" font-weight="400" fill="#57606A" text-anchor="middle">칸별 통과·대기, 병목 추출</text>
+<rect x="916" y="674" width="200" height="72" rx="6" fill="#E6F4F0" stroke="#0E7C66" stroke-width="1.2"/>
+<text x="1016.0" y="706.5" font-family="Noto Sans CJK KR" font-size="14" font-weight="700" fill="#0E7C66" text-anchor="middle">비교 리포트</text>
+<text x="1016.0" y="727.5" font-family="Noto Sans CJK KR" font-size="12" font-weight="400" fill="#57606A" text-anchor="middle">기준 전략 대비 처리 시간</text>
+<rect x="1200" y="334" width="380" height="132" rx="10" fill="#F6F7F9" stroke="#D0D7DE" stroke-width="1.2"/>
+<text x="1216" y="356" font-family="Noto Sans CJK KR" font-size="13" font-weight="700" fill="#57606A" text-anchor="start">③ 외부 AI 서비스 (API)</text>
+<rect x="1216" y="370" width="108" height="80" rx="6" fill="#FFFFFF" stroke="#57606A" stroke-width="1.2"/>
+<text x="1270.0" y="406.5" font-family="Noto Sans CJK KR" font-size="15" font-weight="700" fill="#57606A" text-anchor="middle">LLM</text>
+<text x="1270.0" y="427.5" font-family="Noto Sans CJK KR" font-size="12.5" font-weight="400" fill="#57606A" text-anchor="middle">GPT-4</text>
+<rect x="1336" y="370" width="108" height="80" rx="6" fill="#FFFFFF" stroke="#57606A" stroke-width="1.2"/>
+<text x="1390.0" y="406.5" font-family="Noto Sans CJK KR" font-size="15" font-weight="700" fill="#57606A" text-anchor="middle">STT</text>
+<text x="1390.0" y="427.5" font-family="Noto Sans CJK KR" font-size="12.5" font-weight="400" fill="#57606A" text-anchor="middle">Whisper</text>
+<rect x="1456" y="370" width="108" height="80" rx="6" fill="#FFFFFF" stroke="#57606A" stroke-width="1.2"/>
+<text x="1510.0" y="406.5" font-family="Noto Sans CJK KR" font-size="15" font-weight="700" fill="#57606A" text-anchor="middle">TTS</text>
+<text x="1510.0" y="427.5" font-family="Noto Sans CJK KR" font-size="12.5" font-weight="400" fill="#57606A" text-anchor="middle">음성 안내</text>
+<path d="M1142,390 L1214,390" fill="none" stroke="#8C959F" stroke-width="1.6" marker-end="url(#a)" marker-start="url(#as)"/>
+<text x="1178" y="382" font-family="Noto Sans CJK KR" font-size="11" font-weight="400" fill="#57606A" text-anchor="middle">STT·TTS</text>
+<path d="M1142,436 L1214,436" fill="none" stroke="#8C959F" stroke-width="1.6" marker-end="url(#a)" marker-start="url(#as)"/>
+<text x="1178" y="428" font-family="Noto Sans CJK KR" font-size="11" font-weight="400" fill="#57606A" text-anchor="middle">LLM</text>
+<rect x="1200" y="480" width="380" height="292" rx="10" fill="#F6F7F9" stroke="#D0D7DE" stroke-width="1.2"/>
+<text x="1216" y="502" font-family="Noto Sans CJK KR" font-size="13" font-weight="700" fill="#57606A" text-anchor="start">④ 경로 계산 엔진 (Python · NumPy)</text>
+<rect x="1216" y="514" width="348" height="42" rx="6" fill="#FDF3E4" stroke="#A15C07" stroke-width="1.2"/>
+<text x="1390" y="540" font-family="Noto Sans CJK KR" font-size="13" font-weight="700" fill="#1F2328" text-anchor="middle">작업 할당 · 가장 가까운 유휴 로봇 우선</text>
+<rect x="1216" y="564" width="348" height="42" rx="6" fill="#FDF3E4" stroke="#A15C07" stroke-width="1.2"/>
+<text x="1390" y="590" font-family="Noto Sans CJK KR" font-size="13" font-weight="400" fill="#1F2328" text-anchor="middle">보관 위치 선정</text>
+<rect x="1216" y="614" width="348" height="42" rx="6" fill="#FDF3E4" stroke="#A15C07" stroke-width="1.2"/>
+<text x="1390" y="640" font-family="Noto Sans CJK KR" font-size="13" font-weight="700" fill="#1F2328" text-anchor="middle">다중 로봇 경로 계획 · 우선순위 계획 / CBS</text>
+<rect x="1216" y="664" width="348" height="42" rx="6" fill="#FDF3E4" stroke="#A15C07" stroke-width="1.2"/>
+<text x="1390" y="690" font-family="Noto Sans CJK KR" font-size="13" font-weight="400" fill="#1F2328" text-anchor="middle">충돌 검사 · 롤링 재계획</text>
+<rect x="1216" y="714" width="348" height="42" rx="6" fill="#FDF3E4" stroke="#A15C07" stroke-width="1.2"/>
+<text x="1390" y="740" font-family="Noto Sans CJK KR" font-size="13" font-weight="400" fill="#1F2328" text-anchor="middle">기준 전략 · 무작위 보관 + 선착순 + 개별 최단</text>
+<path d="M1142,710 L1198,710" fill="none" stroke="#A15C07" stroke-width="1.8" marker-end="url(#a)" marker-start="url(#as)"/>
+<text x="1170" y="700" font-family="Noto Sans CJK KR" font-size="11" font-weight="400" fill="#A15C07" text-anchor="middle">경로 요청</text>
+<text x="1170" y="730" font-family="Noto Sans CJK KR" font-size="11" font-weight="400" fill="#A15C07" text-anchor="middle">이동 로그</text>
+<rect x="20" y="786" width="1560" height="138" rx="10" fill="#F6F7F9" stroke="#D0D7DE" stroke-width="1.2"/>
+<text x="36" y="808" font-family="Noto Sans CJK KR" font-size="13" font-weight="700" fill="#57606A" text-anchor="start">⑤ 데이터 계층</text>
+<rect x="40" y="820" width="380" height="90" rx="6" fill="#FFFFFF" stroke="#1F2328" stroke-width="1.2"/>
+<text x="230.0" y="853.0" font-family="Noto Sans CJK KR" font-size="14" font-weight="700" fill="#1F2328" text-anchor="middle">격자 지도 스키마 (공통 계약)</text>
+<text x="230.0" y="874.0" font-family="Noto Sans CJK KR" font-size="12" font-weight="400" fill="#57606A" text-anchor="middle">칸 유형 · 랙 규격 · 운영 규칙</text>
+<text x="230.0" y="891.0" font-family="Noto Sans CJK KR" font-size="12" font-weight="400" fill="#57606A" text-anchor="middle">VR · 엔진 · Agent가 같은 형식 사용</text>
+<rect x="440" y="820" width="380" height="90" rx="6" fill="#FFFFFF" stroke="#1F2328" stroke-width="1.2"/>
+<text x="630.0" y="853.0" font-family="Noto Sans CJK KR" font-size="14" font-weight="700" fill="#1F2328" text-anchor="middle">SQLite</text>
+<text x="630.0" y="874.0" font-family="Noto Sans CJK KR" font-size="12" font-weight="400" fill="#57606A" text-anchor="middle">지도 버전 · 시나리오</text>
+<text x="630.0" y="891.0" font-family="Noto Sans CJK KR" font-size="12" font-weight="400" fill="#57606A" text-anchor="middle">시뮬레이션 로그 · 집계 결과</text>
+<rect x="840" y="820" width="340" height="90" rx="6" fill="#FFFFFF" stroke="#1F2328" stroke-width="1.2"/>
+<text x="1010.0" y="853.0" font-family="Noto Sans CJK KR" font-size="14" font-weight="700" fill="#1F2328" text-anchor="middle">공개 규격 수치</text>
+<text x="1010.0" y="874.0" font-family="Noto Sans CJK KR" font-size="12" font-weight="400" fill="#57606A" text-anchor="middle">파레트·상자 치수, 물동량</text>
+<text x="1010.0" y="891.0" font-family="Noto Sans CJK KR" font-size="12" font-weight="400" fill="#57606A" text-anchor="middle">출처는 별지2에 기재</text>
+<rect x="1200" y="820" width="360" height="90" rx="6" fill="#FFFFFF" stroke="#57606A" stroke-width="1.2" stroke-dasharray="6 4"/>
+<text x="1380.0" y="861.5" font-family="Noto Sans CJK KR" font-size="14" font-weight="700" fill="#57606A" text-anchor="middle">대회 GPU 서버 (선택)</text>
+<text x="1380.0" y="882.5" font-family="Noto Sans CJK KR" font-size="12" font-weight="400" fill="#57606A" text-anchor="middle">대규모 비교 실험 시에만 사용</text>
+<path d="M630,762 L630,818" fill="none" stroke="#8C959F" stroke-width="1.5" stroke-dasharray="5 4" marker-end="url(#a)" marker-start="url(#as)"/>
+<text x="642" y="786" font-family="Noto Sans CJK KR" font-size="11" font-weight="400" fill="#57606A" text-anchor="start">저장 · 조회</text>
+<path d="M1390,774 L1390,818" fill="none" stroke="#8C959F" stroke-width="1.5" stroke-dasharray="5 4" marker-end="url(#a)"/>
+<text x="20" y="956" font-family="Noto Sans CJK KR" font-size="14" font-weight="700" fill="#1F2328" text-anchor="start">처리 흐름</text>
+<text x="100" y="956" font-family="Noto Sans CJK KR" font-size="13" font-weight="400" fill="#1F2328" text-anchor="start">① 음성·텍스트 입력 → ② STT 변환 → ③ LLM 지시 해석 → ④ 격자 지도 생성·검증(실패 시 수정 질문) → ⑤ 작업 할당·경로 계산 →</text>
+<text x="100" y="976" font-family="Noto Sans CJK KR" font-size="13" font-weight="400" fill="#1F2328" text-anchor="start">⑥ 프레임 스트리밍·VR 재생 → ⑦ 로그 집계·병목 분석 → ⑧ 개선안 제시 → ⑨ 사용자 승인 시 재시뮬레이션·비교</text>
+<text x="20" y="1008" font-family="Noto Sans CJK KR" font-size="14" font-weight="700" fill="#1F2328" text-anchor="start">설계 원칙</text>
+<text x="100" y="1008" font-family="Noto Sans CJK KR" font-size="13" font-weight="400" fill="#1F2328" text-anchor="start">LLM은 해석·판단·설명을 맡고 경로 계산은 검증된 알고리즘이 맡는다. LLM이 만든 지도와 개선안은 검증 도구와 사용자 승인을 거친 뒤에만 반영한다.</text>
+<line x1="20" y1="1044" x2="56" y2="1044" stroke="#1F5FBF" stroke-width="2" marker-end="url(#b)"/>
+<text x="64" y="1049" font-family="Noto Sans CJK KR" font-size="12" font-weight="400" fill="#57606A" text-anchor="start">클라이언트 ↔ 서버 통신</text>
+<line x1="240" y1="1044" x2="276" y2="1044" stroke="#0E7C66" stroke-width="1.6" marker-end="url(#t)"/>
+<text x="284" y="1049" font-family="Noto Sans CJK KR" font-size="12" font-weight="400" fill="#57606A" text-anchor="start">Agent 제어 흐름</text>
+<line x1="420" y1="1044" x2="456" y2="1044" stroke="#0E7C66" stroke-width="1.4" stroke-dasharray="5 4" marker-end="url(#t)"/>
+<text x="464" y="1049" font-family="Noto Sans CJK KR" font-size="12" font-weight="400" fill="#57606A" text-anchor="start">피드백 루프</text>
+<line x1="570" y1="1044" x2="606" y2="1044" stroke="#8C959F" stroke-width="1.5" stroke-dasharray="5 4" marker-end="url(#a)"/>
+<text x="614" y="1049" font-family="Noto Sans CJK KR" font-size="12" font-weight="400" fill="#57606A" text-anchor="start">데이터 저장·조회</text>
+<rect x="750" y="1036" width="30" height="16" rx="3" fill="#fff" stroke="#57606A" stroke-dasharray="4 3"/>
+<text x="788" y="1049" font-family="Noto Sans CJK KR" font-size="12" font-weight="400" fill="#57606A" text-anchor="start">선택 구성요소</text>
+</svg>

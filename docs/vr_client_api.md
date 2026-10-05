@@ -45,7 +45,7 @@
 | type | 필드 | VR 동작 |
 |---|---|---|
 | `status` | `{node, message}` | **가정**. 사용자 패널의 진행 체크리스트를 한 칸씩 넘김(노드 이름에 해석, 생성, 검증, 시뮬레이션, 로그, 개선 같은 낱말이 있으면 그 단계로, 모르면 다음 칸). 문장은 관리자 패널 로그에 표시 |
-| `transcript` | `{text, stt_only?}` | `stt_only: true`면 "입력 내용을 확인하세요" 화면(다시 말하기 / 고쳐 쓰기 / 생성하기). 없으면 생성 진행 화면. 빈 문자열이면 "잘 못 들었어요" (EX-03). 시나리오 음성(`/scenario/voice`)이면 인식 문장만 로그에 남기고 `scenario` 를 기다림 |
+| `transcript` | `{text, stt_only?, recognized?}` | `stt_only: true`면 "입력 내용을 확인하세요" 화면(다시 말하기 / 고쳐 쓰기 / 생성하기). 없으면 생성 진행 화면. 빈 문자열이거나 `recognized: false`(모의 서버)면 "음성을 인식하지 못했어요"를 알리고 같은 화면에 기본 창고 설정 문장(질문 답변이면 "나머지는 기본값으로 해줘")을 채워 "기본값으로 생성하기"로 진행 (EX-03). 시나리오 음성(`/scenario/voice`)이면 인식 문장만 로그에 남기고 `scenario` 를 기다림 |
 | `map_ready` | `{map_version, map, summary, defaults_applied[], confirmed?, scenario_defaults?}` | 3D 창고 생성, 요약, 기본값 안내, 확인 버튼 활성. `scenario_defaults`(권장 로봇 수, 주문 수, 1200 규격 비율)를 시뮬레이션 설정 화면에 채움. `confirmed: true`면 확인 생략(개선안 승인 지도, 기록 불러오기) |
 | `question` | `{question_id, text, error_cells[[x,y]...], errors[], options?, missing?, map?}` | 검증 실패 화면(질문 + 선택 버튼 + 말해서 답하기/직접 입력), 문제 칸 빨간색. `options`는 `[{label, text}]`, 최대 3개, 누르면 `text`를 답변으로 보냄. 빠진 정보 질문은 `errors: ["MISSING_INFO"]`, `missing` 에 빠진 항목. `map`이 같이 오면 실패 지도를 먼저 그림 |
 | `sim_ready` | `{sim_id, strategy, total_steps, summary, replan_from?, replan_ms?}` | 로봇 생성, 프레임 200개씩 받으며 재생, 통계 요청. `replan_from`이 있으면 그 스텝 이후만 교체 |
