@@ -85,8 +85,49 @@ def build_candidates(agg: dict, grid: dict, scenario: dict, robots: list[dict] |
     return out
 
 
+class EditConflict(ValueError):
+    """VR 에서 옮긴 랙을 새 지도에 그대로 둘 수 없을 때 (옮긴 자리가 새 지도에서 통로가 아님)."""
+
+    def __init__(self, cells: list[list[int]]):
+        super().__init__(f"VR 에서 옮긴 랙 자리 {cells} 가 새 지도에서 통로가 아닙니다")
+        self.cells = cells
+
+
+def _rack_cells(m: dict) -> dict[tuple[int, int], Any]:
+    return {(c["x"], c["y"]): c.get("rack_id") for c in m["cells"] if c["type"] == "rack"}
+
+
+def vr_edits(grid: dict, req: dict) -> tuple[set, dict]:
+    """요구사항으로 다시 만든 지도와 비교해 VR 에서 옮긴 랙 칸을 찾는다 (편집 이력을 따로 저장하지 않아도 됨).
+    반환: (랙이 빠진 칸 집합, 랙이 새로 놓인 칸 -> rack_id). 지도 크기가 다르면 비교할 수 없어 빈 값."""
+    base = generate_map(req)
+    if (base["width"], base["height"]) != (grid["width"], grid["height"]):
+        return set(), {}
+    b, g = _rack_cells(base), _rack_cells(grid)
+    return set(b) - set(g), {p: g[p] for p in set(g) - set(b)}
+
+
+def carry_edits(new_grid: dict, removed: set, added: dict) -> dict:
+    """VR 에서 옮긴 랙 위치를 새로 만든 지도에 그대로 다시 적용한다. 놓을 자리가 통로가 아니면 EditConflict."""
+    if not removed and not added:
+        return new_grid
+    m = copy.deepcopy(new_grid)
+    kind = {(c["x"], c["y"]): c["type"] for c in m["cells"]}
+    for p in removed:                                   # 원래 자리의 랙 칸은 비운다 (통로)
+        if kind.get(p) == "rack":
+            kind[p] = "aisle"
+    conflicts = [list(p) for p in sorted(added) if kind.get(p, "aisle") != "aisle"]
+    if conflicts:
+        raise EditConflict(conflicts)
+    drop = set(removed) | set(added)
+    m["cells"] = [c for c in m["cells"] if (c["x"], c["y"]) not in drop]
+    m["cells"] += [{"x": x, "y": y, "type": "rack", "rack_id": rid} for (x, y), rid in sorted(added.items())]
+    return m
+
+
 def apply_proposal(proposal: dict, grid: dict, scenario: dict, req: dict) -> dict:
-    """반환: {"changed": "map" | "scenario", "grid", "scenario", "req"}. 원본은 바꾸지 않는다."""
+    """반환: {"changed": "map" | "scenario", "grid", "scenario", "req", "kept_edits"}. 원본은 바꾸지 않는다.
+    도크 추가는 지도를 다시 만들지만, VR 에서 옮긴 랙 위치는 그대로 남긴다 (사용자가 정한 배치)."""
     t = proposal.get("type")
     if t not in PROPOSAL_TYPES:
         raise ValueError(f"허용되지 않은 개선안 유형: {t}")
@@ -94,8 +135,10 @@ def apply_proposal(proposal: dict, grid: dict, scenario: dict, req: dict) -> dic
     g, sc, rq = copy.deepcopy(grid), copy.deepcopy(scenario), dict(req)
     if t == "dock_add":
         key = "dock_in" if a["dock"] == "dock_in" else "dock_out"
+        removed, added = vr_edits(g, rq)               # 도크를 늘리기 전 요구사항 기준으로 비교
         rq[key] = int(rq.get(key, 1)) + 1
-        return {"changed": "map", "grid": generate_map(rq), "scenario": sc, "req": rq}
+        new = carry_edits(generate_map(rq), removed, added)
+        return {"changed": "map", "grid": new, "scenario": sc, "req": rq, "kept_edits": len(added)}
     if t == "one_way":
         g.setdefault("rules", {}).setdefault("one_way", []).append(a["one_way"])
         return {"changed": "map", "grid": g, "scenario": sc, "req": rq}

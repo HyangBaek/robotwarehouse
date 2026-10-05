@@ -12,7 +12,7 @@ from langchain_core.runnables import RunnableConfig
 
 from tools.aggregate import aggregate_logs
 from tools.outcome import explanation_lines, facts_of as outcome_facts
-from tools.proposals import apply_proposal, build_candidates
+from tools.proposals import EditConflict, apply_proposal, build_candidates
 from tools.report import robot_stats
 from . import SOURCE_LABEL, flow_of, session_of, step
 from ..prompts import load
@@ -172,7 +172,14 @@ async def apply(s: AgentState, config: RunnableConfig) -> dict:
     p = e.proposals[s["proposal_id"]]
     entry = f.store.get_map(e.map_version)
     await f.status(se, "개선안 적용", p["text"])
-    res = apply_proposal(p, entry.map, e.scenario, entry.req)
+    try:
+        res = apply_proposal(p, entry.map, e.scenario, entry.req)
+    except EditConflict as ex:                          # 옮긴 랙을 지우지 않고, 적용을 멈춘 뒤 이유를 알린다
+        await f.store.emit(se, {"type": "error", "code": "IMPROVE_INVALID",
+                                "message": f"VR 에서 옮긴 랙이 새 도크 자리와 겹쳐 적용하지 못했어요 {ex.cells}"})
+        return {"error": "IMPROVE_INVALID", "trace": step(s, "apply")}
+    if res.get("kept_edits"):
+        await f.status(se, "개선안 적용", f"VR 에서 옮긴 랙 {res['kept_edits']}칸은 위치를 그대로 유지")
     upd = {"changed": res["changed"], "scenario": res["scenario"], "strategy": e.strategy, "proposal": p,
            "error": None, "trace": step(s, "apply")}
     if res["changed"] == "map":
