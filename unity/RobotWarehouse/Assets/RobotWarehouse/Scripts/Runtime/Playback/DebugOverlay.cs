@@ -8,11 +8,11 @@ using UnityEngine.UI;
 namespace RobotWarehouse.Playback
 {
     /// <summary>
-    /// 관리자·개발자 모드 전용 3D 표시 (관리자·디버그 UI 설계 16·21장).
+    /// 관리자, 개발자 모드 전용 3D 표시 (관리자, 디버그 UI 설계 16, 21장).
     /// - 로봇 머리 위 ID / 대기 표시 (항상 사용자를 향함)
     /// - 격자 선
-    /// - 칸 강조 (로그·검증 오류의 Focus in 3D)
-    /// 모두 창고 루트 아래에 두어 미니어처·실물 축척을 그대로 따른다.
+    /// - 칸 강조 (로그, 검증 오류의 Focus in 3D)
+    /// 모두 창고 루트 아래에 두어 미니어처, 실물 축척을 그대로 따른다.
     /// </summary>
     public class DebugOverlay : MonoBehaviour
     {
@@ -199,7 +199,7 @@ namespace RobotWarehouse.Playback
 
         // ---------------------------------------------------------------- Focus in 3D
 
-        /// <summary>칸 하나를 몇 초 동안 깜빡이는 노란 판으로 강조 (로그·오류 → 3D 위치).</summary>
+        /// <summary>칸 하나를 몇 초 동안 깜빡이는 노란 판으로 강조 (로그, 오류 -> 3D 위치).</summary>
         public void Focus(Vector2Int cell, float seconds = 6f)
         {
             if (warehouse == null || warehouse.Map == null) return;

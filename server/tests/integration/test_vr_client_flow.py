@@ -1,6 +1,6 @@
 """VR 클라이언트가 보낼 수 있는 잘못된 요청이 서버를 멈추게 하지 않는지 (VR 은 WS 결과를 기다리므로 오류도 WS 로 와야 한다).
 
-랙 옮기기 형식 오류·잘못된 위치 → BAD_EDIT, 재계획 입력 오류 → 400, 재계획 중복 → 409, 정상 랙 옮기기 → map_ready,
+랙 옮기기 형식 오류, 잘못된 위치 -> BAD_EDIT, 재계획 입력 오류 -> 400, 재계획 중복 -> 409, 정상 랙 옮기기 -> map_ready,
 개선안 "도크 추가" 승인 뒤에도 VR 에서 옮긴 랙 위치 유지.
 """
 from tests.integration.test_flow_map_to_sim import FULL, SID, make_client, until  # noqa: F401 (fixture)

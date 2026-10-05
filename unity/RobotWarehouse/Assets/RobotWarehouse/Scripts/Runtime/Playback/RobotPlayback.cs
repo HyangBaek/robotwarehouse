@@ -135,7 +135,7 @@ namespace RobotWarehouse.Playback
             float sinA = radius / centerY, cosA = Mathf.Sqrt(1f - sinA * sinA);
             float thetaT = Mathf.Acos(-sinA);           // 접점 위치 (구 위쪽 축 기준 각도)
 
-            // 단면 윤곽 (r, y)와 법선 (nr, ny): 끝 → 접점 → 구 꼭대기
+            // 단면 윤곽 (r, y)와 법선 (nr, ny): 끝 -> 접점 -> 구 꼭대기
             var prof = new List<Vector4>();
             var cone = new Vector2(cosA, -sinA);
             prof.Add(new Vector4(0f, 0f, cone.x, cone.y));

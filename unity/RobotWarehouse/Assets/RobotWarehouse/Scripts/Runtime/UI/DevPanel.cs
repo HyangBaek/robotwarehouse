@@ -5,14 +5,14 @@ using UnityEngine.UI;
 
 namespace RobotWarehouse.UI
 {
-    /// <summary>관리자 패널 탭 (관리자·디버그 UI 설계 4장·37장 1차 구현 + 시연 제어).</summary>
+    /// <summary>관리자 패널 탭 (관리자, 디버그 UI 설계 4장, 37장 1차 구현 + 시연 제어).</summary>
     public enum AdminTab { Dashboard, Connection, Agent, Simulation, Logs, Scenario, Performance }
 
     /// <summary>
-    /// 관리자·개발자 패널 (ui_재료 '관리자/디버그 UI 설계').
-    /// 1600 × 900px (16:9) 캔버스를 0.8mm/px로 → 1.28m × 0.72m.
+    /// 관리자, 개발자 패널 (ui_재료 '관리자/디버그 UI 설계').
+    /// 1600 x 900px (16:9) 캔버스를 0.8mm/px로 -> 1.28m x 0.72m.
     /// 구조: Header(80) / 왼쪽 Navigation(280) + 오른쪽 Content. 사용자 패널과 동시에 보이지 않는다 (모드 전환).
-    /// 값 채우기·버튼 동작은 AppController(Admin 부분)가 한다. 이 클래스는 화면 구성만 맡는다.
+    /// 값 채우기, 버튼 동작은 AppController(Admin 부분)가 한다. 이 클래스는 화면 구성만 맡는다.
     /// </summary>
     public class DevPanel
     {
@@ -243,7 +243,7 @@ namespace RobotWarehouse.UI
 
         // ---------------------------------------------------------------- 공통 조각
 
-        /// <summary>제목 있는 카드. width ≤ 0이면 남는 폭을 나눠 가진다.</summary>
+        /// <summary>제목 있는 카드. width <= 0이면 남는 폭을 나눠 가진다.</summary>
         public static RectTransform Card(Transform parent, string title, float width = -1f, float height = -1f)
         {
             var go = new GameObject("Card_" + title, typeof(RectTransform));
@@ -268,7 +268,7 @@ namespace RobotWarehouse.UI
             return (RectTransform)go.transform;
         }
 
-        /// <summary>가로로 카드를 늘어놓는 줄. height ≤ 0이면 남는 높이를 차지.</summary>
+        /// <summary>가로로 카드를 늘어놓는 줄. height <= 0이면 남는 높이를 차지.</summary>
         static RectTransform CardRow(Transform parent, float height, float spacing = 14f)
         {
             var row = UIFactory.Row(parent, Mathf.Max(0, height), spacing, false);
@@ -280,7 +280,7 @@ namespace RobotWarehouse.UI
             return row;
         }
 
-        /// <summary>이름 · 값 한 줄. 값 Text를 돌려준다.</summary>
+        /// <summary>이름, 값 한 줄. 값 Text를 돌려준다.</summary>
         public static Text KV(Transform parent, string label, float labelWidth = 170f)
         {
             var row = UIFactory.Row(parent, 32, 10, false);
@@ -635,7 +635,7 @@ namespace RobotWarehouse.UI
             _modal.SetActive(false);
         }
 
-        /// <summary>되돌리기 어려운 명령(Stop·Clear·모드 전환) 확인 창 (설계 29장).</summary>
+        /// <summary>되돌리기 어려운 명령(Stop, Clear, 모드 전환) 확인 창 (설계 29장).</summary>
         public void Confirm(string title, string body, string okLabel, Action onOk, bool danger = true)
         {
             _modalTitle.text = title;
@@ -690,8 +690,8 @@ namespace RobotWarehouse.UI
     }
 
     /// <summary>
-    /// 간단한 표 (고정 행 수, 값만 바꿔 씀 → 매번 오브젝트를 만들지 않음).
-    /// 열 너비 ≤ 0이면 남는 폭. clickable이면 줄을 눌러 OnRowClick.
+    /// 간단한 표 (고정 행 수, 값만 바꿔 씀 -> 매번 오브젝트를 만들지 않음).
+    /// 열 너비 <= 0이면 남는 폭. clickable이면 줄을 눌러 OnRowClick.
     /// </summary>
     public class UITable
     {

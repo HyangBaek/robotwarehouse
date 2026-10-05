@@ -376,7 +376,7 @@ async def compare(body: dict[str, Any]):
 
 @app.post("/report")
 async def report(body: dict[str, Any]):
-    """최종 리포트 (FR-25 집계 + FR-28 기준 전략 비교) → WS report. 실제 서버(api/routes_analysis.py)와 같은 형식."""
+    """최종 리포트 (FR-25 집계 + FR-28 기준 전략 비교) -> WS report. 실제 서버(api/routes_analysis.py)와 같은 형식."""
     e = get_sim(body.get("sim_id"))
     s = session(e.session_id)
 

@@ -16,10 +16,10 @@ using Debug = UnityEngine.Debug;
 namespace RobotWarehouse.App
 {
     /// <summary>
-    /// 관리자·개발자 모드 (ui_재료 '관리자/디버그 UI 설계').
+    /// 관리자, 개발자 모드 (ui_재료 '관리자/디버그 UI 설계').
     /// 사용자 UI = 무엇을 해야 하나 / 관리자 UI = 지금 무슨 일이 일어나나 / 개발자 UI = 왜 그렇게 됐나.
     /// 화면 값은 0.25초마다 보이는 탭만 갱신한다 (Quest 프레임 유지). 관리자 모드에서는 사용자 패널을 숨긴다.
-    /// 내부 상태를 직접 고치는 기능은 두지 않는다 (설계 29장: 읽기 중심, 재연결·시나리오·재생 제어만).
+    /// 내부 상태를 직접 고치는 기능은 두지 않는다 (설계 29장: 읽기 중심, 재연결, 시나리오, 재생 제어만).
     /// </summary>
     public partial class AppController
     {
@@ -61,11 +61,11 @@ namespace RobotWarehouse.App
         // 관리자 진입 비밀 입력
         public const int GestureTaps = 3;            // Y를 몇 번
         public const float GestureWindow = 2f;       // 몇 초 안에
-        public const float SettingsVisibleSec = 15f; // ≡ 버튼이 보이는 시간
+        public const float SettingsVisibleSec = 15f; // = 버튼이 보이는 시간
         readonly List<float> _gestureTaps = new List<float>();
         float _settingsUntil;
 
-        // ================================================================== 로그·Agent 기록
+        // ================================================================== 로그, Agent 기록
 
         void Log(LogLevel level, LogModule module, string message, string code = null, Vector2Int? cell = null, string raw = null)
             => _log.Add(level, module, message, code, cell, raw);
@@ -130,7 +130,7 @@ namespace RobotWarehouse.App
             _nodeIndex = -1;
         }
 
-        // ================================================================== 만들기·연결
+        // ================================================================== 만들기, 연결
 
         void BuildAdmin()
         {
@@ -144,7 +144,7 @@ namespace RobotWarehouse.App
                     () => SetAdminMode(false), danger: false));
             _dev.OnTabChanged += _ => _adminTimer = 1f;   // 탭을 바꾸면 바로 갱신
 
-            // Dashboard · Connection
+            // 대시보드, 연결
             _dev.ViewAllLogsButton.onClick.AddListener(() => _dev.ShowTab(AdminTab.Logs));
             _dev.PingButton.onClick.AddListener(Ping);
             _dev.ReconnectButton.onClick.AddListener(Connect);
@@ -271,8 +271,8 @@ namespace RobotWarehouse.App
 
         /// <summary>
         /// 관리자 진입은 사용자가 우연히 누르지 않도록 두 단계로 둔다.
-        /// 1) 왼손 그립을 누른 채 Y를 2초 안에 3번 → 사용자 패널 머리글에 ≡ 버튼이 15초 동안 나타남
-        /// 2) ≡ 버튼을 레이로 눌러야 관리자 모드 진입
+        /// 1) 왼손 그립을 누른 채 Y를 2초 안에 3번 -> 사용자 패널 머리글에 = 버튼이 15초 동안 나타남
+        /// 2) = 버튼을 레이로 눌러야 관리자 모드 진입
         /// 그립 없이 Y만 누르거나, 3번이 2초를 넘기면 세지 않는다. 에디터에서는 F1로 바로 전환(개발 편의, 빌드에는 없음).
         /// </summary>
         void TickAdminGesture()
@@ -314,13 +314,13 @@ namespace RobotWarehouse.App
             Log(LogLevel.Debug, LogModule.Vr, "관리자 진입 입력 확인 → ≡ 버튼 표시");
         }
 
-        /// <summary>사용자 ↔ 관리자 모드. 두 패널을 동시에 보이지 않는다 (설계 31장).</summary>
+        /// <summary>사용자 <-> 관리자 모드. 두 패널을 동시에 보이지 않는다 (설계 31장).</summary>
         void SetAdminMode(bool on)
         {
             _adminMode = on;
             _dev.SetVisible(on);
             _user.Canvas.gameObject.SetActive(!on);
-            // 관리자 모드에서 나오면 ≡ 버튼을 잠깐 남겨 두어 바로 다시 들어갈 수 있게
+            // 관리자 모드에서 나오면 = 버튼을 잠깐 남겨 두어 바로 다시 들어갈 수 있게
             if (!on && _dev != null && _user != null && Time.unscaledTime > 1f)
             {
                 _settingsUntil = Time.unscaledTime + SettingsVisibleSec;
@@ -371,7 +371,7 @@ namespace RobotWarehouse.App
             _dev.ShowTab(AdminTab.Agent);
         }
 
-        /// <summary>/health 응답 시간 측정 (Connection · Ping).</summary>
+        /// <summary>/health 응답 시간 측정 (Connection, Ping).</summary>
         void Ping()
         {
             if (_api == null) _api = new ApiClient(AppConfig.HttpBase);

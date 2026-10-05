@@ -3,11 +3,11 @@
 '처리 못 함'은 분석 실패가 아니다. 시뮬레이션은 끝까지 돌았고, 주문 일부를 처리하지 못한 채 끝난 상태다.
 
 원인 판단 (엔진이 사유를 주면 그대로, 없으면 로그로 추정)
-  거절된 입하 주문   → no_capacity  같은 규격 랙에 빈칸이 없음 (지도 검증이 길 막힘을 먼저 거르므로)
-  거절된 출하 주문   → no_stock     같은 규격 재고가 없음
-  orders[].reason 이 unreachable  → 길 막힘 (PIBT 엔진처럼 사유를 주는 엔진)
-  log.stopped == deadlock         → 로봇 정체 (PIBT 엔진)
-  스텝 상한에 닿음                 → max_steps
+  거절된 입하 주문  -> no_capacity  같은 규격 랙에 빈칸이 없음 (지도 검증이 길 막힘을 먼저 거르므로)
+  거절된 출하 주문  -> no_stock     같은 규격 재고가 없음
+  orders[].reason 이 unreachable -> 길 막힘 (PIBT 엔진처럼 사유를 주는 엔진)
+  log.stopped == deadlock        -> 로봇 정체 (PIBT 엔진)
+  스텝 상한에 닿음                -> max_steps
 
 결과는 세 군데에 쓴다.
   1. sim_ready.summary["처리 못 함"], sim_ready.issues : VR 패널
@@ -98,7 +98,7 @@ def _robots(sc: dict) -> int:
 
 
 def _rack_line_room(grid: dict | None, req: dict) -> int:
-    """랙 한 줄이 처음에 받을 수 있는 입고 수 (줄 전체 용량 × (1 - 시작 재고 비율 0.5))."""
+    """랙 한 줄이 처음에 받을 수 있는 입고 수 (줄 전체 용량 x (1 - 시작 재고 비율 0.5))."""
     racks = (grid or {}).get("racks") or []
     lines = int(req.get("racks") or 0)
     if not racks or not lines:

@@ -9,7 +9,7 @@ namespace RobotWarehouse.UI
     public enum LogLevel { Debug, Info, Warn, Error }
     public enum LogModule { Agent, Api, Ws, Sim, Vr, Validator }
 
-    /// <summary>관리자 Log Viewer 한 줄 (관리자·디버그 UI 설계 18~21장).</summary>
+    /// <summary>관리자 Log Viewer 한 줄 (관리자, 디버그 UI 설계 18~21장).</summary>
     public class LogEntry
     {
         public DateTime Time;
@@ -21,7 +21,7 @@ namespace RobotWarehouse.UI
         public string Raw;          // 원본 JSON (있으면)
     }
 
-    /// <summary>로그 보관 (최근 500줄). 필터·검색·내보내기.</summary>
+    /// <summary>로그 보관 (최근 500줄). 필터, 검색, 내보내기.</summary>
     public class AdminLog
     {
         public const int Capacity = 500;
@@ -103,7 +103,7 @@ namespace RobotWarehouse.UI
     public enum NodeState { Waiting, Running, Completed, Error }
     public enum RunState { Idle, Running, Completed, Question, Error }
 
-    /// <summary>Agent 실행 한 단계 (서버 status 메시지 하나). Agent의 생각이 아니라 실제 시스템 이벤트·도구 호출 기준.</summary>
+    /// <summary>Agent 실행 한 단계 (서버 status 메시지 하나). Agent의 생각이 아니라 실제 시스템 이벤트, 도구 호출 기준.</summary>
     public class AgentNode
     {
         public string Name;
@@ -116,7 +116,7 @@ namespace RobotWarehouse.UI
         public double Seconds => ((End ?? DateTime.Now) - Start).TotalSeconds;
     }
 
-    /// <summary>요청 하나에 대한 Agent 실행 기록 (입력 → 노드들 → 결과).</summary>
+    /// <summary>요청 하나에 대한 Agent 실행 기록 (입력 -> 노드들 -> 결과).</summary>
     public class AgentRun
     {
         public int Number;

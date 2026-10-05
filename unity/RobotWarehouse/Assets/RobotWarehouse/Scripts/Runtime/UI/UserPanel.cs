@@ -63,7 +63,7 @@ namespace RobotWarehouse.UI
 
         // S01 창고 만들기
         public Button SpeakButton, ManualButton, HistoryButton;
-        public Button AdminButton;   // 머리글 오른쪽 '≡' (관리자 모드 진입, 평소 숨김)
+        public Button AdminButton;   // 머리글 오른쪽 '=' (관리자 모드 진입, 평소 숨김)
         public Button ViewModeButton;   // 머리글 '1:1 보기 / 축소 보기' (창고가 있을 때만)
         public Text CreateStatus, RequiredInfo;
 
@@ -613,7 +613,7 @@ namespace RobotWarehouse.UI
             hl.childForceExpandWidth = true;
             CmpPlayback = UIFactory.Button(f, "재생 보기", null, UIFactory.Secondary);
             CmpRerun = UIFactory.Button(f, "다시 시뮬레이션", null, UIFactory.Secondary);
-            // 개선(또는 전략 비교) 결과의 최종 리포트: 지금 결과의 KPI, 로봇·주문 통계, 기준 전략 비교
+            // 개선(또는 전략 비교) 결과의 최종 리포트: 지금 결과의 KPI, 로봇, 주문 통계, 기준 전략 비교
             CmpReport = UIFactory.Button(f, "리포트", null, UIFactory.Primary);
         }
 
@@ -687,7 +687,7 @@ namespace RobotWarehouse.UI
             var sr = (RectTransform)go.transform;
             // 화면(Screen_*)은 레이아웃 그룹이 없는 Screens 아래에 늘여 붙인 별도 레이아웃 루트라서,
             // 캔버스만 다시 계산하면 화면 안 글자 폭이 갱신되지 않는다 (폭 100px로 계산돼 높이가 몇 배로 커짐).
-            // 캔버스 → 화면 순서로 둘 다 다시 계산한 뒤 잰다.
+            // 캔버스 -> 화면 순서로 둘 다 다시 계산한 뒤 잰다.
             LayoutRebuilder.ForceRebuildLayoutImmediate(rt);
             LayoutRebuilder.ForceRebuildLayoutImmediate(sr);
             float chrome = rt.rect.height - _body.rect.height;          // 여백 + 머리글 + 구분선
