@@ -59,6 +59,44 @@ namespace RobotWarehouse.Core
             }
         }
 
+        // ---------------- 관리자 PIN (관리자·디버그 UI 설계 30장)
+        public const string DefaultAdminPin = "0000";
+
+        public static bool AdminPinRequired
+        {
+            get
+            {
+                var c = ServerConfig.Load();
+                return c == null || c.requireAdminPin;
+            }
+        }
+
+        public static int AdminPinLength
+        {
+            get
+            {
+                var c = ServerConfig.Load();
+                return c != null && !string.IsNullOrEmpty(c.adminPinHash) ? Math.Max(4, Math.Min(6, c.adminPinLength)) : DefaultAdminPin.Length;
+            }
+        }
+
+        /// <summary>PIN은 원문 대신 해시로 저장한다 (빌드 파일을 열어도 바로 보이지 않게. 보안 장치가 아니라 시연 중 실수 진입 방지용).</summary>
+        public static string HashPin(string pin)
+        {
+            using (var sha = System.Security.Cryptography.SHA256.Create())
+            {
+                var bytes = sha.ComputeHash(System.Text.Encoding.UTF8.GetBytes("robotwarehouse-admin:" + (pin ?? "")));
+                return BitConverter.ToString(bytes).Replace("-", "").ToLowerInvariant();
+            }
+        }
+
+        public static bool CheckAdminPin(string pin)
+        {
+            var c = ServerConfig.Load();
+            var stored = c != null && !string.IsNullOrEmpty(c.adminPinHash) ? c.adminPinHash : HashPin(DefaultAdminPin);
+            return string.Equals(HashPin(pin), stored, StringComparison.OrdinalIgnoreCase);
+        }
+
         public static string HttpBase => $"http://{Host}:{Port}";
         public static string WsBase => $"ws://{Host}:{Port}";
     }

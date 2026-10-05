@@ -16,6 +16,14 @@ namespace RobotWarehouse.Core
         public int port = 8000;
         [Tooltip("앱 시작 시 자동 연결")]
         public bool autoConnect = true;
+        [Header("관리자 모드")]
+        [Tooltip("관리자 모드 진입에 PIN 입력을 요구 (시연·제출 빌드는 켜 둘 것)")]
+        public bool requireAdminPin = true;
+        [Tooltip("PIN 해시 (SHA-256). 에디터 메뉴 1. 서버 연결 → 관리자 PIN 에서 바꾼다. 비어 있으면 기본 PIN 0000")]
+        public string adminPinHash = "";
+        [Tooltip("PIN 자리 수 (4~6)")]
+        public int adminPinLength = 4;
+
 
         static ServerConfig _cached;
 

@@ -22,7 +22,8 @@ namespace RobotWarehouse.UI
         Heatmap,        // 히트맵 보기
         Analysis,       // S06 병목 분석
         Approval,       // S07 개선안 승인
-        Comparison      // S08 개선 전, 후 비교
+        Comparison,     // S08 개선 전, 후 비교
+        Pin             // 관리자 PIN 입력 (≡ -> PIN -> 관리자 모드)
     }
 
     public enum ConnectionView { Connected, Connecting, Reconnecting, Disconnected, Offline }
@@ -50,7 +51,6 @@ namespace RobotWarehouse.UI
         Text _stepBadgeText, _title;
         readonly Image[] _progress = new Image[4];
         readonly Text[] _progressText = new Text[4];
-        int _curStep = 1;                             // 지금 화면의 진행 단계 (완료 표시를 다시 그릴 때)
         int _reachedStep = 1;                         // 이번 흐름에서 도달한 가장 높은 단계 (그 앞 단계는 완료)
         readonly bool[] _stepDone = new bool[5];      // 단계별 완료 표시 (4 결과 분석: 병목 분석 결과를 받으면)
         readonly Image[] _progressLine = new Image[3];
@@ -139,6 +139,16 @@ namespace RobotWarehouse.UI
         public GameObject CmpHeatRow;
         public Button CmpBeforeHeat, CmpAfterHeat, CmpPlayback, CmpRerun, CmpReport;
 
+        // 관리자 PIN
+        public Text PinMessage;
+        public Button PinCancel, PinConfirm;
+        public readonly List<Button> PinKeys = new List<Button>();   // 0~9, 10 = 지움, 11 = ←
+        readonly List<Image> _pinDots = new List<Image>();
+        (UserScreen screen, int step, string title, Color color)? _beforePin;
+        int _curStep = 1;
+        string _curTitle = "";
+        Color _curColor = UIFactory.TextMain;
+
         // Feedback (토스트)
         RectTransform _toast;
         Image _toastBg;
@@ -178,6 +188,7 @@ namespace RobotWarehouse.UI
             BuildAnalysis();
             BuildApproval();
             BuildComparison();
+            BuildPin();
             BuildToast();
 
             Show(UserScreen.Create, 1, "창고 만들기");
@@ -583,6 +594,77 @@ namespace RobotWarehouse.UI
             ApprovalApply = UIFactory.Button(f, "✓  적용", null, UIFactory.Success, 380);
         }
 
+        void BuildPin()
+        {
+            var (c, f) = NewScreen(UserScreen.Pin, FullHeight);
+            UIFactory.Label(c, "관리자 PIN을 입력하세요", UIFactory.FontBody, UIFactory.TextMain, TextAnchor.MiddleCenter);
+            var dots = UIFactory.Row(c, 40, 22, false);
+            UIFactory.Spacer(dots);
+            for (int i = 0; i < 6; i++)
+            {
+                var (img, _) = UIFactory.Badge(dots, 30, "", UIFactory.TextMuted, true);
+                _pinDots.Add(img);
+            }
+            UIFactory.Spacer(dots);
+            PinMessage = UIFactory.Label(c, "", UIFactory.FontSmall, UIFactory.Warning, TextAnchor.MiddleCenter);
+            UIFactory.SetHeight(PinMessage, 30);
+
+            var pad = new GameObject("Keypad", typeof(RectTransform));
+            pad.transform.SetParent(c, false);
+            var gl = pad.AddComponent<GridLayoutGroup>();
+            gl.cellSize = new Vector2(170, 78);
+            gl.spacing = new Vector2(16, 12);
+            gl.childAlignment = TextAnchor.UpperCenter;
+            gl.constraint = GridLayoutGroup.Constraint.FixedColumnCount;
+            gl.constraintCount = 3;
+            UIFactory.SetHeight(pad.transform as RectTransform, 4 * 78 + 3 * 12);
+            string[] labels = { "1", "2", "3", "4", "5", "6", "7", "8", "9", "지움", "0", "←" };
+            var keys = new Button[12];
+            foreach (var l in labels)
+            {
+                bool fn = l == "지움" || l == "←";
+                var b = UIFactory.Button(pad.transform, l, null, fn ? UIFactory.Secondary : new Color(1f, 1f, 1f, 0.16f), 170, 78,
+                    fn ? UIFactory.FontBody : UIFactory.FontTitle);
+                int idx = l == "지움" ? 10 : l == "←" ? 11 : int.Parse(l);
+                keys[idx] = b;
+            }
+            PinKeys.AddRange(keys);
+
+            PinCancel = UIFactory.Button(f, "취소", null, UIFactory.Secondary, 300);
+            UIFactory.Spacer(f);
+            PinConfirm = UIFactory.Button(f, "확인", null, UIFactory.Primary, 340);
+        }
+
+        /// <summary>PIN 점 표시: length = 자리 수, filled = 입력한 개수.</summary>
+        public void SetPinDots(int length, int filled, bool error = false)
+        {
+            for (int i = 0; i < _pinDots.Count; i++)
+            {
+                bool on = i < length;
+                _pinDots[i].gameObject.SetActive(on);
+                if (!on) continue;
+                bool full = i < filled;
+                _pinDots[i].sprite = full ? UIFactory.CircleSprite : UIFactory.RingSprite;
+                _pinDots[i].color = error ? UIFactory.Danger : full ? UIFactory.Primary : UIFactory.TextMuted;
+            }
+        }
+
+        /// <summary>지금 화면을 기억해 두고 PIN 화면으로.</summary>
+        public void ShowPin()
+        {
+            if (Current != UserScreen.Pin) _beforePin = (Current, _curStep, _curTitle, _curColor);
+            Show(UserScreen.Pin, _curStep, "관리자 모드");
+        }
+
+        /// <summary>PIN 화면을 닫고 원래 화면으로 (그 사이 다른 화면으로 바뀌었으면 그대로 둔다).</summary>
+        public void ClosePin()
+        {
+            if (Current != UserScreen.Pin) return;
+            var b = _beforePin ?? (UserScreen.Create, 1, "창고 만들기", UIFactory.TextMain);
+            _beforePin = null;
+            Show(b.screen, b.step, b.title, b.color);
+        }
+
         void BuildComparison()
         {
             var (c, f) = NewScreen(UserScreen.Comparison, 780);
@@ -665,6 +747,8 @@ namespace RobotWarehouse.UI
             // 창고를 다시 만들거나 확인하는 단계(1, 2)로 돌아가면 이후 진행은 새로 시작. 3, 4 사이 이동은 진행 유지
             if (step <= 2) _reachedStep = step;
             else _reachedStep = Mathf.Max(_reachedStep, step);
+            _curTitle = title;
+            _curColor = titleColor ?? UIFactory.TextMain;
             _title.text = title;
             _title.color = titleColor ?? UIFactory.TextMain;
             SetStep(step);

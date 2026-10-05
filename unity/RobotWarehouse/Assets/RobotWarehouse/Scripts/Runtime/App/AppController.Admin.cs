@@ -65,6 +65,14 @@ namespace RobotWarehouse.App
         readonly List<float> _gestureTaps = new List<float>();
         float _settingsUntil;
 
+        // 관리자 PIN
+        public const int PinMaxFails = 3;          // 연속으로 틀리면
+        public const float PinLockSec = 30f;       // 이만큼 잠금
+        public const float PinGraceSec = 300f;     // 맞힌 뒤 5분 동안은 다시 묻지 않음
+        string _pinInput = "";
+        int _pinFails;
+        float _pinLockUntil, _pinOkUntil;
+
         // ================================================================== 로그·Agent 기록
 
         void Log(LogLevel level, LogModule module, string message, string code = null, Vector2Int? cell = null, string raw = null)
@@ -134,7 +142,14 @@ namespace RobotWarehouse.App
 
         void BuildAdmin()
         {
-            _user.AdminButton.onClick.AddListener(() => { _settingsUntil = 0f; _user.SetSettingsVisible(false); SetAdminMode(true); });
+            _user.AdminButton.onClick.AddListener(RequestAdmin);
+            _user.PinCancel.onClick.AddListener(() => { _pinInput = ""; _user.ClosePin(); });
+            _user.PinConfirm.onClick.AddListener(SubmitPin);
+            for (int i = 0; i < _user.PinKeys.Count; i++)
+            {
+                int k = i;
+                _user.PinKeys[i].onClick.AddListener(() => PinKey(k));
+            }
             _overlay = _warehouse.gameObject.AddComponent<DebugOverlay>();
             _overlay.playback = _playback;
             _overlay.warehouse = _warehouse;
@@ -295,6 +310,7 @@ namespace RobotWarehouse.App
                 }
             }
             _prevY = y;
+            TickPin();
 #if UNITY_EDITOR
             var kb = UnityEngine.InputSystem.Keyboard.current;
             if (kb != null && kb.f1Key.wasPressedThisFrame) SetAdminMode(!_adminMode);
@@ -303,6 +319,95 @@ namespace RobotWarehouse.App
             {
                 _settingsUntil = 0f;
                 _user.SetSettingsVisible(false);
+            }
+        }
+
+        /// <summary>≡ 버튼: PIN이 필요하면 PIN 화면, 아니면 바로 관리자 모드.</summary>
+        void RequestAdmin()
+        {
+            var sc = _user.Current;
+            if (sc == UserScreen.Processing || sc == UserScreen.Recording)
+            {
+                _user.Toast("지금 작업이 끝난 뒤 열 수 있어요", ToastKind.Warning);
+                return;
+            }
+            _settingsUntil = 0f;
+            _user.SetSettingsVisible(false);
+            if (!AppConfig.AdminPinRequired || Time.unscaledTime < _pinOkUntil)
+            {
+                SetAdminMode(true);
+                return;
+            }
+            _pinInput = "";
+            UpdatePinView();
+            _user.ShowPin();
+        }
+
+        void PinKey(int k)
+        {
+            if (Time.unscaledTime < _pinLockUntil) return;
+            if (k == 10) _pinInput = "";
+            else if (k == 11) { if (_pinInput.Length > 0) _pinInput = _pinInput.Substring(0, _pinInput.Length - 1); }
+            else if (_pinInput.Length < AppConfig.AdminPinLength) _pinInput += k.ToString();
+            _user.PinMessage.text = "";
+            UpdatePinView();
+            if (_pinInput.Length == AppConfig.AdminPinLength) SubmitPin();   // 자리 수를 채우면 바로 확인
+        }
+
+        void SubmitPin()
+        {
+            if (Time.unscaledTime < _pinLockUntil) return;
+            if (_pinInput.Length < AppConfig.AdminPinLength)
+            {
+                _user.PinMessage.text = $"{AppConfig.AdminPinLength}자리를 모두 입력하세요";
+                return;
+            }
+            if (AppConfig.CheckAdminPin(_pinInput))
+            {
+                _pinInput = "";
+                _pinFails = 0;
+                _pinOkUntil = Time.unscaledTime + PinGraceSec;
+                Log(LogLevel.Info, LogModule.Vr, "관리자 PIN 확인 → 관리자 모드");
+                _user.ClosePin();
+                SetAdminMode(true);
+                return;
+            }
+            _pinInput = "";
+            _pinFails++;
+            Log(LogLevel.Warn, LogModule.Vr, $"관리자 PIN 틀림 ({_pinFails}/{PinMaxFails})", "PIN_FAIL");
+            if (_pinFails >= PinMaxFails)
+            {
+                _pinFails = 0;
+                _pinLockUntil = Time.unscaledTime + PinLockSec;
+                Log(LogLevel.Warn, LogModule.Vr, $"관리자 PIN {PinMaxFails}번 틀림 → {PinLockSec:0}초 잠금", "PIN_LOCK");
+            }
+            else _user.PinMessage.text = $"PIN이 맞지 않아요 (남은 시도 {PinMaxFails - _pinFails}번)";
+            UpdatePinView(error: true);
+        }
+
+        void UpdatePinView(bool error = false)
+        {
+            _user.SetPinDots(AppConfig.AdminPinLength, _pinInput.Length, error);
+            bool locked = Time.unscaledTime < _pinLockUntil;
+            foreach (var b in _user.PinKeys) UIFactory.SetInteractable(b, !locked);
+            UIFactory.SetInteractable(_user.PinConfirm, !locked);
+        }
+
+        /// <summary>PIN 잠금 남은 시간 표시 (매 프레임, PIN 화면일 때만).</summary>
+        void TickPin()
+        {
+            if (_user.Current != UserScreen.Pin) return;
+            float left = _pinLockUntil - Time.unscaledTime;
+            if (left > 0f)
+            {
+                var msg = $"여러 번 틀려서 잠겼어요. {Mathf.CeilToInt(left)}초 뒤 다시 시도하세요";
+                if (_user.PinMessage.text != msg) _user.PinMessage.text = msg;
+                if (_user.PinConfirm.interactable) UpdatePinView(true);
+            }
+            else if (!_user.PinConfirm.interactable)
+            {
+                _user.PinMessage.text = "";
+                UpdatePinView();
             }
         }
 
@@ -554,7 +659,7 @@ namespace RobotWarehouse.App
                 {
                     var (glyph, col, state) = n.State switch
                     {
-                        NodeState.Completed => ("√", DevPanel.StatusGreen, $"{n.Seconds:0.00} sec"),
+                        NodeState.Completed => ("✓", DevPanel.StatusGreen, $"{n.Seconds:0.00} sec"),
                         NodeState.Running => ("●", DevPanel.StatusBlue, $"RUNNING  {n.Seconds:0.0}s"),
                         NodeState.Error => ("×", DevPanel.StatusRed, "ERROR"),
                         _ => ("○", DevPanel.StatusGray, "WAITING")
@@ -565,8 +670,8 @@ namespace RobotWarehouse.App
                 {
                     RunState.Running => ("○  Response", "WAITING", DevPanel.StatusGray),
                     RunState.Error => ("×  Response", run.Result ?? "ERROR", DevPanel.StatusRed),
-                    RunState.Question => ("√  Response", "question → 사용자", DevPanel.StatusYellow),
-                    _ => ("√  Response", run.Result ?? "", DevPanel.StatusGreen)
+                    RunState.Question => ("✓  Response", "question → 사용자", DevPanel.StatusYellow),
+                    _ => ("✓  Response", run.Result ?? "", DevPanel.StatusGreen)
                 };
                 nodes.Add((resp.Item1, resp.Item2, resp.Item3, null));
             }
@@ -613,7 +718,7 @@ namespace RobotWarehouse.App
                 var (rn, node) = timeline[r];
                 var st = node.State switch
                 {
-                    NodeState.Completed => "√ 완료", NodeState.Running => "● 실행 중", NodeState.Error => "× 오류", _ => "○ 대기"
+                    NodeState.Completed => "✓ 완료", NodeState.Running => "● 실행 중", NodeState.Error => "× 오류", _ => "○ 대기"
                 };
                 _dev.ToolTimeline.Set(r, null, node.Start.ToString("HH:mm:ss"),
                     string.IsNullOrEmpty(node.Tool) ? node.Name : $"{node.Name} · {node.Tool}",
@@ -788,9 +893,12 @@ namespace RobotWarehouse.App
             }
             if (_lastCompare != null)
             {
-                float pct = _lastCompare["improvement_pct"] != null ? (float)_lastCompare["improvement_pct"] : 0f;
-                T(_dev.CompareSummary, $"Improvement  {pct:0.0}%");
-                _dev.CompareSummary.color = pct >= 0 ? UIFactory.Lighten(DevPanel.StatusGreen, 0.2f) : DevPanel.StatusYellow;
+                // improvement_pct 가 null 이면(비교 불가) JValue 를 float 로 바꾸다 예외가 나므로 형식을 먼저 확인
+                var pv = _lastCompare["improvement_pct"];
+                bool hasPct = pv != null && pv.Type != JTokenType.Null;
+                float pct = hasPct ? (float)pv : 0f;
+                T(_dev.CompareSummary, hasPct ? $"Improvement  {pct:0.0}%" : $"Improvement  n/a ({(string)_lastCompare["note"] ?? "incomplete"})");
+                _dev.CompareSummary.color = hasPct && pct >= 0 ? UIFactory.Lighten(DevPanel.StatusGreen, 0.2f) : DevPanel.StatusYellow;
             }
         }
 

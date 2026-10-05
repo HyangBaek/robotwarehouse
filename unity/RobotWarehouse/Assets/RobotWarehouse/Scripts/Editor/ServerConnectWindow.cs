@@ -22,12 +22,15 @@ namespace RobotWarehouse.EditorTools
         MessageType _resultType = MessageType.None;
         UnityWebRequest _req;
         bool _loaded;
+        bool _requirePin = true;
+        string _newPin = "", _newPin2 = "";
+        bool _hasCustomPin;
 
         [MenuItem("RobotWarehouse/1. 서버 연결", priority = 1)]
         public static void Open()
         {
             var w = GetWindow<ServerConnectWindow>(true, "서버 연결");
-            w.minSize = new Vector2(440, 300);
+            w.minSize = new Vector2(460, 480);
             w.LoadFromAsset();
             w.Show();
         }
@@ -51,6 +54,8 @@ namespace RobotWarehouse.EditorTools
                 _host = c.host;
                 _port = c.port;
                 _autoConnect = c.autoConnect;
+                _requirePin = c.requireAdminPin;
+                _hasCustomPin = !string.IsNullOrEmpty(c.adminPinHash);
             }
             _loaded = true;
         }
@@ -87,11 +92,66 @@ namespace RobotWarehouse.EditorTools
                 }
             }
 
+            EditorGUILayout.Space(12);
+            EditorGUILayout.LabelField("관리자 PIN", EditorStyles.boldLabel);
+            EditorGUILayout.HelpBox(
+                "VR 안에서 왼손 그립 + Y 3번 → 사용자 패널의 ≡ → PIN 입력 → 관리자 모드.\n" +
+                (_hasCustomPin ? "PIN이 설정되어 있습니다." : $"기본 PIN {AppConfig.DefaultAdminPin} 사용 중입니다. 시연 전에 바꾸세요.") +
+                "\n에디터 Play 중에는 F1로 PIN 없이 바로 전환됩니다 (빌드에는 없음).",
+                _hasCustomPin ? MessageType.Info : MessageType.Warning);
+            _requirePin = EditorGUILayout.Toggle("진입 시 PIN 요구", _requirePin);
+            _newPin = DigitsOnly(EditorGUILayout.PasswordField("새 PIN (숫자 4~6자리)", _newPin));
+            _newPin2 = DigitsOnly(EditorGUILayout.PasswordField("새 PIN 확인", _newPin2));
+            using (new EditorGUILayout.HorizontalScope())
+            {
+                if (GUILayout.Button("PIN 저장", GUILayout.Height(24))) SavePin();
+                using (new EditorGUI.DisabledScope(!_hasCustomPin))
+                {
+                    if (GUILayout.Button("기본 PIN으로 되돌리기", GUILayout.Height(24))) ResetPin();
+                }
+            }
+
             if (!string.IsNullOrEmpty(_result))
             {
                 EditorGUILayout.Space();
                 EditorGUILayout.HelpBox(_result, _resultType);
             }
+        }
+
+        static string DigitsOnly(string s)
+        {
+            var sb = new System.Text.StringBuilder();
+            foreach (var ch in s ?? "") if (char.IsDigit(ch) && sb.Length < 6) sb.Append(ch);
+            return sb.ToString();
+        }
+
+        void SavePin()
+        {
+            if (_newPin.Length < 4) { _result = "PIN은 숫자 4~6자리로 입력하세요."; _resultType = MessageType.Error; return; }
+            if (_newPin != _newPin2) { _result = "두 PIN이 다릅니다."; _resultType = MessageType.Error; return; }
+            var c = LoadOrCreate();
+            c.adminPinHash = AppConfig.HashPin(_newPin);
+            c.adminPinLength = _newPin.Length;
+            c.requireAdminPin = _requirePin;
+            EditorUtility.SetDirty(c);
+            AssetDatabase.SaveAssets();
+            _hasCustomPin = true;
+            _newPin = _newPin2 = "";
+            GUI.FocusControl(null);
+            _result = "관리자 PIN을 저장했습니다 (해시로 저장, 다음 빌드부터 적용).";
+            _resultType = MessageType.Info;
+        }
+
+        void ResetPin()
+        {
+            var c = LoadOrCreate();
+            c.adminPinHash = "";
+            c.adminPinLength = AppConfig.DefaultAdminPin.Length;
+            EditorUtility.SetDirty(c);
+            AssetDatabase.SaveAssets();
+            _hasCustomPin = false;
+            _result = $"기본 PIN {AppConfig.DefaultAdminPin}으로 되돌렸습니다.";
+            _resultType = MessageType.Warning;
         }
 
         /// <summary>"http://1.2.3.4:8000/" 같은 입력도 받아 호스트, 포트로 나눈다.</summary>
@@ -117,6 +177,7 @@ namespace RobotWarehouse.EditorTools
             c.host = _host;
             c.port = _port;
             c.autoConnect = _autoConnect;
+            c.requireAdminPin = _requirePin;
             EditorUtility.SetDirty(c);
             AssetDatabase.SaveAssets();
             _result = $"저장했습니다: {_host}:{_port} ({AssetPath})";

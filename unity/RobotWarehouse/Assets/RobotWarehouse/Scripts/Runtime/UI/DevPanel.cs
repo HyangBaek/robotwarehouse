@@ -210,7 +210,7 @@ namespace RobotWarehouse.UI
             }
             UIFactory.Spacer(nav);
             UserModeButton = UIFactory.Button(nav, "←  사용자 모드", null, new Color(1f, 1f, 1f, 0.12f), -1, 64, FBody);
-            UIFactory.Label(nav, "진입: 왼손 그립 + Y 3번 → ≡", FSmall - 3, UIFactory.TextMuted, TextAnchor.MiddleCenter);
+            UIFactory.Label(nav, "진입: 그립+Y 3번 → ≡ → PIN", FSmall - 3, UIFactory.TextMuted, TextAnchor.MiddleCenter);
         }
 
         RectTransform Page(RectTransform content, AdminTab tab)
