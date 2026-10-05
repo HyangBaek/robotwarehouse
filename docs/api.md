@@ -40,13 +40,13 @@
 | status | {node, message} — Agent 진행 단계 (STT, 지시 해석 (gpt-oss:20b), regex_fallback, 격자 지도 생성, 지도 검증, 수정 질문, 시뮬레이션 실행, 로그 분석, 비교 리포트, 롤링 재계획, 개선안 제안) |
 | transcript | {text, stt_only?, recognized?} — 무음이거나 Whisper 가 지어낸 문장("시청해 주셔서 감사합니다" 등)만 나오면 text 는 "" 와 STT_EMPTY. 모의 서버는 recognized=false |
 | map_ready | {map_version, map, summary, defaults_applied[], confirmed?, scenario_defaults?{robots, inbound, outbound, basis}} |
-| question | {question_id, text, error_cells[[x, y]], errors[], map?, missing?[]} — 필수 정보 누락이면 errors=["MISSING_INFO"], missing=빠진 키, map 없음 |
+| question | {question_id, text, error_cells[[x, y]], errors[], map?, missing?[], limit_reached?, max_questions?} — 필수 정보 누락이면 errors=["MISSING_INFO"], missing=빠진 키, map 없음. 지도 검증 질문이 한도에 닿으면 limit_reached=true 로 세션을 열어 둔 채 다시 묻는다(질문 횟수 0으로 초기화) |
 | scenario | {map_version, robots, inbound, outbound, run, changed[], basis} — 시나리오 문장·음성 해석 결과. VR은 패널 값에 반영하고 run이면 실행 |
 | sim_ready | {sim_id, strategy, total_steps, summary, completed, issues[], replan_from?, replan_ms?} — 주문을 다 처리하지 못해도 보낸다. 그때 `summary["처리 못 함"]`에 원인별 문장 |
 | compare | {baseline, optimized, improvement_pct} |
 | analysis | {bottlenecks[{x, y, wait}], explanation, issues[], proposals[{proposal_id, type(dock_add, robot_count, storage_weight, one_way, map_resize, order_count), text, reason, effects}]} — 처리 못 한 주문이 있으면 설명 맨 앞에 원인, 개선안 앞쪽에 재시뮬레이션 권고 |
 | report | {sim_id, map_summary, scenario, kpis, robots[], orders, timeline[], baseline?, comparison[], insights[], bottlenecks[], html_url} — 최종 리포트 (`tools/report.py`) |
-| error | {code, message} — EMPTY_TEXT, STT_EMPTY, STT_UNAVAILABLE, STT_ERROR, QUESTION_LIMIT, AGENT_ERROR, COLLISION, ENGINE_ERROR, IMPROVE_INVALID |
+| error | {code, message} — EMPTY_TEXT, STT_EMPTY, STT_UNAVAILABLE, STT_ERROR, QUESTION_LIMIT(예전 서버만), AGENT_ERROR, COLLISION, ENGINE_ERROR, IMPROVE_INVALID |
 
 로봇 `state`: move_empty, move_loaded, load, unload, wait, idle.
 
@@ -56,6 +56,7 @@
 - "기본값", "알아서", "나머지는 기본값"이면 빠진 항목을 기본값으로 채우고 `defaults_applied`에 적는다.
 - 질문 한도(3회)에 닿으면 남은 항목은 기본값으로 채운다.
 - 정보가 다 모인 뒤 지도 검증 오류(도크 0개, 통로 없음, 일방통행 막다른 길)가 있으면 기존처럼 문제 칸과 함께 되묻는다.
+- 검증 질문이 한도(3회)에 닿아도 끝내지 않는다. `limit_reached: true` 질문을 보내고, VR은 "계속 수정"(답변)과 "처음부터 다시 입력"을 고르게 한다.
 
 ## 권장 시나리오
 `scenario_defaults.robots` = 도크 수 × 2 + 4 (2~16대, 랙 수 × 2 + 2 이하), 주문은 입하·출하 각 25건. 근거는 `experiments/run_compare.py` 보정 실험 (README 5장).

@@ -87,6 +87,24 @@ async def ask_question(s: AgentState, config: RunnableConfig) -> dict:
     return {"question_text": text, "question_count": count, "trace": step(s, "ask_question")}
 
 
+async def limit_question(s: AgentState, config: RunnableConfig) -> dict:
+    """질문 한도에 닿아도 창고 만들기를 끝내지 않는다. 마지막 검증 오류로 질문을 한 번 더 내고(limit_reached),
+    '계속 수정하기'(이 질문에 답하기) 와 '처음부터 다시 입력하기' 중 사용자가 고르게 한다. 질문 횟수는 새로 센다."""
+    f = flow_of(config)
+    se = session_of(f, s)
+    errors = s["validation"]["errors"]
+    text, cells = question_for(errors)
+    codes = [e["code"] for e in errors]
+    await f.status(se, "수정 질문", f"질문 {settings.max_questions}회 반복 -> 계속 수정 / 다시 입력 선택")
+    qid = f.store.new_id("Q")
+    se.question_id, se.question_text = qid, text
+    f.store.questions[qid] = se.session_id
+    await f.store.emit(se, {"type": "question", "question_id": qid, "text": text, "error_cells": cells, "errors": codes,
+                            "options": options_for(errors), "map": s["map"],
+                            "limit_reached": True, "max_questions": settings.max_questions})
+    return {"question_text": text, "question_count": 0, "trace": step(s, "limit_question")}
+
+
 async def give_up(s: AgentState, config: RunnableConfig) -> dict:
     f = flow_of(config)
     se = session_of(f, s)

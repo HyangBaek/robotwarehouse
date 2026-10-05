@@ -263,3 +263,19 @@ def test_api_report(client):  # FR-25, FR-28: 리포트 (실제 서버와 같은
         assert key in rep
     assert rep["kpis"]["orders_done"] == rep["orders"]["done"] == 12
     assert len(rep["robots"]) == 3 and rep["comparison"][0]["key"] == "total_steps"
+
+
+def test_question_limit_keeps_session_open(client):
+    """질문 한도에 닿아도 창고 만들기를 끝내지 않고 limit_reached 질문으로 계속 수정 / 다시 입력을 고르게 한다."""
+    with client.websocket_connect("/ws/s7") as ws:
+        client.post("/map/text", json={"session_id": "s7", "text": "랙 10줄을 통로 없이 붙여서 배치해줘"})
+        q = recv_until(ws, "question")
+        for _ in range(5):
+            if q.get("limit_reached"):
+                break
+            client.post("/map/answer", json={"session_id": "s7", "question_id": q["question_id"], "text": "그대로 해줘"})
+            q = recv_until(ws, "question")
+        assert q.get("limit_reached") is True
+        client.post("/map/answer", json={"session_id": "s7", "question_id": q["question_id"],
+                                       "text": "통로 폭 3m, 입하 도크 1개, 출하 도크 1개로 해줘"})
+        assert recv_until(ws, "map_ready")["map_version"]

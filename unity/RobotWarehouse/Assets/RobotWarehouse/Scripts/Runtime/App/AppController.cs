@@ -1107,12 +1107,9 @@ namespace RobotWarehouse.App
                                 code == "STT_EMPTY" ? "음성을 인식하지 못했어요" : "음성 인식기를 쓸 수 없어요");
                     }
                     return;
-                case "QUESTION_LIMIT":
-                    _work = Work.None;
-                    ResetQuestion();
-                    SetPhase(_warehouse.Map != null && !string.IsNullOrEmpty(_mapVersion) ? Phase.AwaitConfirm : Phase.Idle);
+                case "QUESTION_LIMIT": // 예전 서버 호환: 새 서버는 limit_reached 질문을 보낸다
                     _user.Toast("질문이 여러 번 반복됐어요. 창고 설명을 처음부터 다시 해 주세요", ToastKind.Warning, 6f);
-                    GoCreate();
+                    RestartFromScratch();
                     return;
                 default:
                     ShowError(string.IsNullOrEmpty(text) ? code : text, null);
@@ -1249,7 +1246,11 @@ namespace RobotWarehouse.App
             _editPending = false;
             _questionId = msg.GetString("question_id");
             _questionText = msg.GetString("text");
-            _questionRounds++;
+            // 질문 한도에 닿으면 서버가 limit_reached 질문을 보낸다: 끝내지 않고 계속 수정 / 처음부터 다시 입력을 고르게 한다.
+            var limitToken = msg.Get("limit_reached");
+            bool limitReached = limitToken != null && limitToken.Type == JTokenType.Boolean && (bool)limitToken;
+            int maxQuestions = msg.GetInt("max_questions", AppConfig.MaxQuestionRounds);
+            _questionRounds = limitReached ? 0 : _questionRounds + 1;
             var cells = msg.GetCells("error_cells");
             if (_warehouse.Map != null) _warehouse.SetHighlight(cells);
             var codes = msg.GetStringList("errors");
@@ -1258,17 +1259,34 @@ namespace RobotWarehouse.App
             _agent.Finish(RunState.Question, "question: " + (codes.Count > 0 ? string.Join(",", codes) : _questionText), msg.Raw);
 
             _user.QuestionProblem.text = cells.Count > 0 ? $"<color={UIFactory.Hex(UIFactory.Danger)}>■</color>  문제 칸 {cells.Count}개를 창고에 빨간색으로 표시했어요" : "";
-            _user.QuestionText.text = _questionText;
-            _user.QuestionRound.text = $"질문 {_questionRounds} / {AppConfig.MaxQuestionRounds}";
+            _user.QuestionText.text = limitReached
+                ? $"질문이 {maxQuestions}번 반복됐어요. 계속 수정하거나 처음부터 다시 입력할 수 있어요.\n{_questionText}"
+                : _questionText;
+            _user.QuestionRound.text = limitReached ? "계속 수정 / 다시 입력" : $"질문 {_questionRounds} / {AppConfig.MaxQuestionRounds}";
             _user.ClearOptions();
-            foreach (var (label, text) in ParseOptions(msg.Get("options")))
+            var options = ParseOptions(msg.Get("options"));
+            if (limitReached && options.Count > 2) options.RemoveRange(2, options.Count - 2);
+            foreach (var (label, text) in options)
             {
                 var t = text;
                 _user.AddOption(label, () => SendAnswer(t));
             }
+            if (limitReached)
+                _user.AddOption("처음부터 다시 입력", RestartFromScratch);
             _user.EndOptions();
+            if (limitReached)
+                _user.Toast("질문이 여러 번 반복됐어요. 답하면 계속 수정하고, 처음부터 다시 입력할 수도 있어요", ToastKind.Warning, 6f);
             SetPhase(Phase.Question);
             FinishProcessing(GoQuestion, 0.7f, failed: true);
+        }
+
+        /// <summary>질문 한도에서 "처음부터 다시 입력": 질문을 접고 창고 설명 입력으로 돌아간다.</summary>
+        void RestartFromScratch()
+        {
+            _work = Work.None;
+            ResetQuestion();
+            SetPhase(_warehouse.Map != null && !string.IsNullOrEmpty(_mapVersion) ? Phase.AwaitConfirm : Phase.Idle);
+            GoCreate();
         }
 
         /// <summary>질문 선택지: [{label, text}] 또는 ["2m", "3m"] 둘 다 받는다 (최대 3개).</summary>

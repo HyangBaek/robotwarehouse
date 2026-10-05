@@ -47,13 +47,13 @@
 | `status` | `{node, message}` | **가정**. 사용자 패널의 진행 체크리스트를 한 칸씩 넘김(노드 이름에 해석, 생성, 검증, 시뮬레이션, 로그, 개선 같은 낱말이 있으면 그 단계로, 모르면 다음 칸). 문장은 관리자 패널 로그에 표시 |
 | `transcript` | `{text, stt_only?, recognized?}` | `stt_only: true`면 "입력 내용을 확인하세요" 화면(다시 말하기 / 고쳐 쓰기 / 생성하기). 없으면 생성 진행 화면. 빈 문자열이거나 `recognized: false`(모의 서버)면 "음성을 인식하지 못했어요"를 알리고 같은 화면에 기본 창고 설정 문장(질문 답변이면 "나머지는 기본값으로 해줘")을 채워 "기본값으로 생성하기"로 진행 (EX-03). 시나리오 음성(`/scenario/voice`)이면 인식 문장만 로그에 남기고 `scenario` 를 기다림 |
 | `map_ready` | `{map_version, map, summary, defaults_applied[], confirmed?, scenario_defaults?}` | 3D 창고 생성, 요약, 기본값 안내, 확인 버튼 활성. `scenario_defaults`(권장 로봇 수, 주문 수, 1200 규격 비율)를 시뮬레이션 설정 화면에 채움. `confirmed: true`면 확인 생략(개선안 승인 지도, 기록 불러오기) |
-| `question` | `{question_id, text, error_cells[[x,y]...], errors[], options?, missing?, map?}` | 검증 실패 화면(질문 + 선택 버튼 + 말해서 답하기/직접 입력), 문제 칸 빨간색. `options`는 `[{label, text}]`, 최대 3개, 누르면 `text`를 답변으로 보냄. 빠진 정보 질문은 `errors: ["MISSING_INFO"]`, `missing` 에 빠진 항목. `map`이 같이 오면 실패 지도를 먼저 그림 |
+| `question` | `{question_id, text, error_cells[[x,y]...], errors[], options?, missing?, map?}` | 검증 실패 화면(질문 + 선택 버튼 + 말해서 답하기/직접 입력), 문제 칸 빨간색. `options`는 `[{label, text}]`, 최대 3개, 누르면 `text`를 답변으로 보냄. 빠진 정보 질문은 `errors: ["MISSING_INFO"]`, `missing` 에 빠진 항목. `map`이 같이 오면 실패 지도를 먼저 그림. `limit_reached: true`(질문 한도 도달)면 질문 횟수를 0으로 되돌리고 "질문이 N번 반복됐어요" 안내 + 서버 선택지 최대 2개 + "처음부터 다시 입력" 버튼. 말하기·직접 입력 답변은 계속 수정으로 처리 |
 | `sim_ready` | `{sim_id, strategy, total_steps, summary, replan_from?, replan_ms?}` | 로봇 생성, 프레임 200개씩 받으며 재생, 통계 요청. `replan_from`이 있으면 그 스텝 이후만 교체 |
 | `compare` | `{baseline, optimized, improvement_pct}` | 비교 화면 표(두 객체에 같이 있는 숫자 항목 최대 3개와 변화율) |
 | `analysis` | `{bottlenecks[{x,y,wait}], explanation, proposals[{proposal_id,type,text,reason,effects}]}` | 병목 분석 화면(가장 큰 병목 위치, 대기 횟수, Agent 설명, 개선안 버튼), 3D 병목 마커, 히트맵 자동 켜기. 개선안을 고르면 승인 화면에 `effects`(예상 효과 문장 목록)를 보여 줌. `type`: dock_add, robot_count, storage_weight, one_way |
 | `report` | 최종 리포트 (`docs/api.md`) | 재생이 끝나면 사용자 정면에 리포트 창 표시 (요약, 로봇 효율, 주문, 비교 탭). 재생 화면 '리포트' 버튼으로도 열기 |
 | `scenario` | `{robots, inbound, outbound, spec_b_pct, run, basis}` | 시뮬레이션 설정 화면 값 갱신 (-/+로 다시 조정 가능). `run: true`면 바로 실행 |
-| `error` | `{code, message}` | 패널 위 빨간 알림 + 진행 중이던 화면에서 이전 단계로. `QUESTION_LIMIT`이면 창고 만들기 화면으로 |
+| `error` | `{code, message}` | 패널 위 빨간 알림 + 진행 중이던 화면에서 이전 단계로. `QUESTION_LIMIT`(예전 서버)이면 창고 만들기 화면으로 |
 
 `total_steps`는 **마지막 프레임의 `t`** 로 해석합니다(프레임은 `t = 0 … total_steps`). 서버가 프레임 수로 보내도 VR이 받은 마지막 `t`로 맞춥니다.
 

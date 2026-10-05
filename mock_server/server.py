@@ -151,18 +151,18 @@ async def build_map(s: Session, req: dict[str, Any], defaults: list[str], from_a
         await emit(s, {"type": "map_ready", "map_version": version, "map": m, "summary": summarize(m),
                        "defaults_applied": defaults})
         return
-    if s.question_count >= MAX_QUESTIONS:
-        s.question_id = None
-        s.question_count = 0
-        await emit(s, {"type": "error", "code": "QUESTION_LIMIT", "message": "입력을 다시 해 주세요"})
-        return
+    # 질문 한도에 닿아도 끝내지 않는다: limit_reached 질문으로 '계속 수정하기 / 처음부터 다시 입력하기'를 고르게 하고 횟수는 새로 센다
+    limit = s.question_count >= MAX_QUESTIONS
     text, cells = question_for(result["errors"])
     qid = new_id("Q")
     s.question_id = qid
-    s.question_count += 1
+    s.question_count = 0 if limit else s.question_count + 1
     QUESTIONS[qid] = s.session_id
-    await emit(s, {"type": "question", "question_id": qid, "text": text, "error_cells": cells,
-                   "errors": codes, "options": options_for(result["errors"]), "map": m})
+    msg = {"type": "question", "question_id": qid, "text": text, "error_cells": cells,
+           "errors": codes, "options": options_for(result["errors"]), "map": m}
+    if limit:
+        msg.update(limit_reached=True, max_questions=MAX_QUESTIONS)
+    await emit(s, msg)
 
 
 async def handle_text(s: Session, text: str):

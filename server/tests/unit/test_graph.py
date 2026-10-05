@@ -41,7 +41,7 @@ def test_compose_question_answer_trace_and_memory():
     run(go())
 
 
-def test_validation_question_then_give_up_after_limit():
+def test_validation_question_limit_keeps_session_open():
     f, s = _flow()
 
     async def go():
@@ -51,7 +51,12 @@ def test_validation_question_then_give_up_after_limit():
             a = await f.run_graph(s, intent="answer", answer="그대로 해줘")
             assert a["trace"][-1] == "ask_question" and a["question_count"] == i + 2
         a = await f.run_graph(s, intent="answer", answer="그대로 해줘")
-        assert a["trace"][-1] == "give_up" and f.store.sent[-1]["code"] == "QUESTION_LIMIT"
+        # 한도에 닿아도 끝내지 않고, 계속 수정할지 다시 입력할지 고르게 하는 질문을 낸다 (횟수는 새로 셈)
+        q = f.store.sent[-1]
+        assert a["trace"][-1] == "limit_question" and a["question_count"] == 0
+        assert q["type"] == "question" and q["limit_reached"] is True and s.question_id == q["question_id"]
+        b = await f.run_graph(s, intent="answer", answer="통로 폭 3m로 해줘")     # 계속 수정하기
+        assert b["trace"][-1] == "emit_map" and f.store.sent[-1]["type"] == "map_ready"
     run(go())
 
 

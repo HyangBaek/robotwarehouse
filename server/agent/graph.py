@@ -19,7 +19,7 @@ from .state import AgentState
 
 NODES = {
     "interpret": c.interpret, "generate_map": c.generate_map, "validate": c.validate,
-    "ask_question": c.ask_question, "give_up": c.give_up, "emit_map": c.emit_map,
+    "ask_question": c.ask_question, "limit_question": c.limit_question, "give_up": c.give_up, "emit_map": c.emit_map,
     "simulate": sm.simulate, "analyze": an.analyze, "propose": an.propose, "apply": an.apply,
 }
 
@@ -35,8 +35,9 @@ def build_graph(nodes: dict | None = None, checkpointer=None):
     g.add_conditional_edges("interpret", r.route_after_interpret, {"generate": "generate_map", "ask": "ask_question"})
     g.add_edge("generate_map", "validate")
     g.add_conditional_edges("validate", r.route_after_validate,
-                            {"ok": "emit_map", "ask": "ask_question", "abort": "give_up", "fail": "give_up"})
+                            {"ok": "emit_map", "ask": "ask_question", "abort": "limit_question", "fail": "give_up"})
     g.add_edge("ask_question", END)
+    g.add_edge("limit_question", END)
     g.add_edge("give_up", END)
     g.add_conditional_edges("emit_map", r.route_after_emit, {"simulate": "simulate", "end": END})
     g.add_edge("simulate", END)
