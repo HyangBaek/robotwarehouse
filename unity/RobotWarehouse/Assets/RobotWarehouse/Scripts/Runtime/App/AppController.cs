@@ -60,6 +60,10 @@ namespace RobotWarehouse.App
         [Range(0f, 0.5f)] public float glassFloorAlpha = 0.1f;
         [Tooltip("실물 보기에서 창고 둘레 벽을 반투명하게")]
         public bool translucentWallsInLifeSize = true;
+        [Tooltip("축소 보기(미니어처)에서 창고 둘레 벽을 반투명하게 (벽 뒤 로봇이 보이게)")]
+        public bool translucentWallsInMiniature = true;
+        [Tooltip("축소 보기 벽의 불투명도 (1이면 불투명)")]
+        [Range(0.1f, 1f)] public float miniatureWallAlpha = 0.35f;
 
         [Header("테이블이 없을 때")]
         [Tooltip("미니어처 창고를 놓을 위치 (월드 좌표)")]
@@ -315,6 +319,7 @@ namespace RobotWarehouse.App
             });
             // 병목 기둥(분석 결과 3D 마커) 켜고 끄기: 분석 화면, 히트맵 화면
             _user.AnalysisMarkersButton.onClick.AddListener(ToggleMarkers);
+            _user.ViewModeButton.onClick.AddListener(ToggleViewMode);   // 머리글 1:1 보기 / 축소 보기
             _user.HeatmapMarkersButton.onClick.AddListener(ToggleMarkers);
             _user.PathCloseButton.onClick.AddListener(GoPlayback);
             _user.MetricWaitButton.onClick.AddListener(() => SetMetric(HeatmapMetric.Wait));
@@ -329,6 +334,7 @@ namespace RobotWarehouse.App
             _user.CmpAfterHeat.onClick.AddListener(() => ShowStatsHeatmap(false));
             _user.CmpPlayback.onClick.AddListener(() => { RestoreAfterStats(); GoPlayback(); });
             _user.CmpRerun.onClick.AddListener(GoSimConfig);
+            _user.CmpReport.onClick.AddListener(OpenReport);   // 적용 후 결과(지금 시뮬레이션)의 리포트. 닫으면 이 화면으로 돌아옴
         }
 
         Transform Rig => Camera.main != null ? Camera.main.transform.root : null;
@@ -400,6 +406,7 @@ namespace RobotWarehouse.App
             _user.SpecB.Interactable = !busy;
             UIFactory.SetInteractable(_user.ScenarioSpeakButton, Connected && _mapConfirmed && !busy && !_offline);
             UIFactory.SetInteractable(_user.ReportButton, hasSim && !busy);
+            UIFactory.SetInteractable(_user.CmpReport, hasSim && !busy && !_offline);
             UIFactory.SetInteractable(_user.HistoryButton, Connected && !busy && !_offline);
             UIFactory.SetInteractable(_user.AnalyzeButton, hasSim && !busy);
             UIFactory.SetInteractable(_user.SettingsButton, Connected && _mapConfirmed && !_offline && !busy);
@@ -1284,6 +1291,7 @@ namespace RobotWarehouse.App
             _framesComplete = false;
             _warehouse.ClearMarkers();
             _markerCount = -1;
+            _user.SetStepDone(4, false);          // 새 시뮬레이션 결과: 분석은 다시 해야 함
             _proposals.Clear();
             _simSummary = SummaryLine(msg.Get("summary"));
             Log(LogLevel.Info, LogModule.Sim, $"sim_ready ({strategy}) 총 {total} 스텝. {SimParsers.Describe(msg.Get("summary"))}", null, null, msg.Raw);
@@ -1600,6 +1608,7 @@ namespace RobotWarehouse.App
             _warehouse.SetBottleneckMarkers(bottlenecks);
             _warehouse.SetMarkersVisible(true);   // 새 분석 결과는 보이게 시작
             _markerCount = bottlenecks.Count;
+            _user.SetStepDone(4, true);           // 진행 단계 4(결과 분석) 완료
             Log(LogLevel.Info, LogModule.Agent, "병목: " + string.Join(", ", bottlenecks.Take(5).Select(b => $"({b.x},{b.y}) 대기 {b.wait}")),
                 "BOTTLENECK", bottlenecks.Count > 0 ? new Vector2Int(bottlenecks[0].x, bottlenecks[0].y) : (Vector2Int?)null, msg.Raw);
             _agent.Finish(RunState.Completed, $"analysis 병목 {bottlenecks.Count}곳", msg.Raw);
@@ -1614,7 +1623,7 @@ namespace RobotWarehouse.App
             }
             else
             {
-                _user.BottleneckTitle.text = "√ 큰 병목이 없어요";
+                _user.BottleneckTitle.text = "✓ 큰 병목이 없어요";
                 _user.BottleneckTitle.color = UIFactory.Lighten(UIFactory.Success, 0.3f);
                 _user.BottleneckWhere.text = "";
                 _user.BottleneckDetail.text = "";
@@ -1669,6 +1678,7 @@ namespace RobotWarehouse.App
             if (_rackEditor.Editing) ToggleRackEdit();
             _warehouse.Build(map);
             ApplyViewMode();
+            RefreshViewModeButton();
         }
 
         void ResetSimulation()
@@ -1682,12 +1692,16 @@ namespace RobotWarehouse.App
             _pathView.SetVisible(false);
             _warehouse.ClearMarkers();
             _markerCount = -1;
+            _user.SetStepDone(4, false);
             _user.ClearProposals();
         }
+
+        void RefreshViewModeButton() => _user.SetViewMode(_warehouse.Map != null, _miniature);
 
         void ToggleViewMode()
         {
             _miniature = !_miniature;
+            RefreshViewModeButton();
             if (_miniature)
             {
                 SetLifeSizeVisuals(false, Vector3.zero, 0f);
@@ -1774,7 +1788,9 @@ namespace RobotWarehouse.App
                 _glassFloor.SetActive(false);
             }
 
-            _warehouse.SetWallsTranslucent(life && translucentWallsInLifeSize);
+            if (life) _warehouse.SetWallsTranslucent(translucentWallsInLifeSize);
+            else _warehouse.SetWallsTranslucent(translucentWallsInMiniature && miniatureWallAlpha < 1f,
+                                                WarehouseRenderer.WallColor, miniatureWallAlpha);
         }
 
         /// <summary>미니어처: 테이블 위 축소 모형 / 실물: 바닥에 1:1, 사용자 앞 남쪽 가장자리에서 시작.</summary>

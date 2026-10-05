@@ -32,6 +32,8 @@ except ImportError:  # scipy 없으면 그리디 할당으로 대체
 
 INF = 10 ** 6
 PASSABLE = {"aisle", "dock_in", "dock_out", "charge"}
+# 충전 칸은 출발 칸이나 목표 칸으로만 쓴다. 다른 곳으로 가는 길에 지나가지 않는다 (짐을 실은 로봇 포함)
+NO_TRANSIT = {"charge"}
 DEFAULT_SPEC = "pallet_1100x1100"            # 한국 표준 파레트 (KS T-11), 랙 slot_spec 이 없으면 이 규격
 
 DEFAULT_CFG = dict(
@@ -91,6 +93,7 @@ class Grid:
         self.dock_in = [i for i in range(N) if self.type[i] == "dock_in"]
         self.dock_out = [i for i in range(N) if self.type[i] == "dock_out"]
         self.charge = [i for i in range(N) if self.type[i] == "charge"]
+        self.no_transit = [t in NO_TRANSIT for t in self.type]
 
         self.rack_cap = {r["rack_id"]: r.get("capacity", 6) for r in m.get("racks", [])}
         self.rack_spec = {r["rack_id"]: r.get("slot_spec", DEFAULT_SPEC) for r in m.get("racks", [])}
@@ -134,32 +137,57 @@ class Grid:
         self.zero = [0] * N
         self._d: dict[int, list[int]] = {}
 
-        # 랙 칸에 접근 가능한 통로 칸
+        # 랙 칸에 접근 가능한 통로 칸. 파레트는 랙 정면(긴 면)에서만 넣고 뺀다.
+        # 세로로 늘어선 랙은 좌우(x±1), 가로로 늘어선 랙은 위아래(y±1)가 정면. 랙 끝(짧은 면)에서는 작업하지 않는다.
+        # 정면에 통로가 없는 칸(편집으로 모양이 바뀐 랙 등)만 예외로 네 방향을 허용한다.
+        run_dirs = {}
+        for rid, cells in self.racks.items():
+            xs = {c % W for c in cells}
+            ys = {c // W for c in cells}
+            if len(xs) == 1 and len(ys) > 1:
+                run_dirs[rid] = ((1, 0), (-1, 0))
+            elif len(ys) == 1 and len(xs) > 1:
+                run_dirs[rid] = ((0, 1), (0, -1))
+        all_dirs = ((1, 0), (-1, 0), (0, 1), (0, -1))
         self.access = {}
-        for i in rack_cell:
+        for i, rid in rack_cell.items():
             x, y = i % W, i // W
-            acc = []
-            for dx, dy in ((1, 0), (-1, 0), (0, 1), (0, -1)):
-                nx, ny = x + dx, y + dy
-                if 0 <= nx < W and 0 <= ny < H and self.ok[ny * W + nx]:
-                    acc.append(ny * W + nx)
-            self.access[i] = acc
+
+            def neighbors_ok(dirs):
+                out = []
+                for dx, dy in dirs:
+                    nx, ny = x + dx, y + dy
+                    if 0 <= nx < W and 0 <= ny < H and self.ok[ny * W + nx] and not self.no_transit[ny * W + nx]:
+                        out.append(ny * W + nx)
+                return out
+
+            self.access[i] = neighbors_ok(run_dirs.get(rid, all_dirs)) or neighbors_ok(all_dirs)
 
     def dist(self, goal: int) -> list[int]:
-        """모든 칸에서 goal까지의 최단 이동 수 (일방통행 반영, 역방향 BFS, 캐시)."""
+        """모든 칸에서 goal까지의 최단 이동 수 (일방통행 반영, 역방향 BFS, 캐시).
+        충전 칸은 출발 칸으로만 거리를 갖고, 그 칸을 거쳐 가는 길은 세지 않는다."""
         d = self._d.get(goal)
         if d is None:
             d = [INF] * self.N
             d[goal] = 0
             q = deque([goal])
+            nt = self.no_transit
             while q:
                 i = q.popleft()
                 for j in self.radj[i]:
-                    if d[j] == INF:
+                    if d[j] == INF and not (nt[i] and nt[j]):   # 충전 칸끼리 옆으로 옮겨 가지 않음
                         d[j] = d[i] + 1
-                        q.append(j)
+                        if not nt[j]:
+                            q.append(j)
             self._d[goal] = d
         return d
+
+    def can_enter(self, cur: int, nxt: int, goal: int) -> bool:
+        """cur -> nxt 이동 가능 여부 (충전 칸 규칙).
+        충전 칸은 통로에서 목표로만 들어가고, 충전 칸끼리 옆으로 옮겨 가지 않는다. 나올 때는 통로로 나온다."""
+        if nxt == cur or not self.no_transit[nxt]:
+            return True
+        return nxt == goal and not self.no_transit[cur]
 
 
 # --------------------------------------------------------------------------- 예약 표
@@ -203,6 +231,7 @@ def plan_one(g: Grid, start: int, goal: int, res: Resv, W: int):
         h = g.zero
         wc = 0
     v, e, last = res.v, res.e, res.last
+    ntr = g.no_transit
     best = {start: 0}
     par = {start: -1}
     heap = [(h[start], 0, start)]
@@ -226,6 +255,8 @@ def plan_one(g: Grid, start: int, goal: int, res: Resv, W: int):
         t1 = t + 1
         base = t * N + i
         for j in adjw[i]:
+            if j != i and ntr[j] and (j != goal or ntr[i]):  # 충전 칸: 통로에서 목표로만 들어간다
+                continue
             k1 = t1 * N + j
             if k1 in v:
                 continue
@@ -328,7 +359,7 @@ def pibt_step(g: Grid, rs: dict, prio: dict, rng: random.Random) -> dict:
 
     def cands(a):
         p, goal, _ = rs[a]
-        opts = list(g.adjw[p])
+        opts = [c for c in g.adjw[p] if g.can_enter(p, c, goal)]
         if goal >= 0:
             h = g.dist(goal)
             opts.sort(key=lambda c: (h[c], tie[a] if c == p else rng.random()))
@@ -770,10 +801,11 @@ class Sim:
                 want[r["id"]] = p
                 continue
             h = g.dist(goal)
-            if r["stall"] >= self.cfg["stall_patience"] and rng.random() < 0.5:
-                want[r["id"]] = rng.choice(g.adj[p])
+            nbr = [j for j in g.adj[p] if g.can_enter(p, j, goal)]
+            if r["stall"] >= self.cfg["stall_patience"] and rng.random() < 0.5 and nbr:
+                want[r["id"]] = rng.choice(nbr)
             else:
-                want[r["id"]] = next(j for j in g.adj[p] if h[j] < h[p])
+                want[r["id"]] = next((j for j in nbr if h[j] < h[p]), p)
         n = len(self.robots)
         ids = [r["id"] for r in self.robots]
         ids = ids[self.t % n:] + ids[:self.t % n]              # 우선권 회전

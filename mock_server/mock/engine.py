@@ -179,14 +179,16 @@ class Sim:
         while q:
             c = q.popleft()
             for n in neighbors(*c):
-                if n in self.passable and n not in d:
+                if n in self.passable and n not in d and not (c in self.charge_set and n in self.charge_set):
                     d[n] = d[c] + 1
-                    q.append(n)
+                    if n not in self.charge_set:   # 충전 칸은 출발, 도착만 가능 (지나가는 길로 쓰지 않음)
+                        q.append(n)
         self.dist_cache[goal] = d
         return d
 
     # ---------------------------------------------------------------- 시공간 A*
     def plan(self, rid, start, t0, goal, work):
+        """충전 칸은 통로에서 목표로만 들어가고 통로로 나온다 (지나가는 길로 쓰지 않고, 충전 칸끼리 옮겨 가지 않음)."""
         h = self.dist(goal)
         if start not in h:
             return None
@@ -218,6 +220,8 @@ class Sim:
                 continue
             for n in list(neighbors(*c)) + [c]:
                 if n != c and (n not in self.passable or not self._move_ok(c, n)):
+                    continue
+                if n != c and n in self.charge_set and (n != goal or c in self.charge_set):
                     continue
                 if n not in h or self._blocked(n, t + 1, rid):
                     continue
@@ -254,7 +258,8 @@ class Sim:
                 else:
                     state = "carry" if loaded else "move"
             else:
-                state = tr.get(t, (c, "idle", None))[1]
+                # 경로 첫 칸: 앞서 기록된 상태를 쓰고, 없으면 주문이 있는 로봇은 '대기'(작업 중 정지), 없으면 '유휴'
+                state = tr.get(t, (c, "wait" if order_id else "idle", None))[1]
             tr[t] = (c, state, order_id)
         t_end = t0 + len(path) - 1
         for k in range(1, (0 if parked_goal else WORK_STEPS) + 1):
@@ -389,8 +394,9 @@ class Sim:
         if path is None:
             r.fails += 1
             # 교착 회피: 여러 번 실패하면 잠시 주차 칸으로 비켜 섰다가 다시 시도
+            # 작업 중에는 충전 칸으로 비켜 서지 않는다 (충전 칸은 일이 없는 로봇의 주차, 충전 자리)
             if r.fails >= 6:
-                spot = self._parking_for(r, t, exclude_current=True)
+                spot = self._parking_for(r, t, exclude_current=True, allow_charge=False)
                 detour = self.plan(r.rid, r.pos, t, spot, 0) if spot else None
                 if detour is not None and len(detour) > 1:
                     self.commit(r, detour, t, "wait", loaded, order.order_id, parked_goal=True)
@@ -410,12 +416,14 @@ class Sim:
             order.done_t = r.free_at
             r.order = None
 
-    def _parking_for(self, r: Robot, t, exclude_current: bool = False):
+    def _parking_for(self, r: Robot, t, exclude_current: bool = False, allow_charge: bool = True):
         if r.pos in self.parking_set and not exclude_current:
             return r.pos
         d = self.dist(r.pos)
         for p in sorted(self.parking, key=lambda p: (p not in self.charge_set, d.get(p, 10 ** 6), p)):
             if exclude_current and p == r.pos:
+                continue
+            if not allow_charge and p in self.charge_set:
                 continue
             if d.get(p) is not None and self._free_forever(p, t, r.rid):
                 return p

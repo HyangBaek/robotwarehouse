@@ -26,6 +26,7 @@ namespace RobotWarehouse.Playback
             public Transform root;
             public Renderer status;     // 상태 색을 보여 주는 렌더러 (기본 도형이면 몸체 자체)
             public GameObject cargo;    // 적재 중일 때만 보이는 상자
+            public Renderer cargoTop;   // 상자 윗면: 상태 색 (상자가 표시등을 가려도 상태가 보이게)
             public Vector2 lastPos;
             public bool hasLast;
             public float baseHeight;    // 기본 도형은 0.2m 띄움, 모델은 바닥
@@ -175,18 +176,16 @@ namespace RobotWarehouse.Playback
             return mesh;
         }
 
-        static bool IsLoaded(string state)
+        /// <summary>상자 윗면에 얇은 판을 얹는다. 상자 크기에 맞춰 따라가도록 상자의 자식으로 둔다.</summary>
+        static Renderer AddCargoTop(GameObject box)
         {
-            switch ((state ?? "").ToLowerInvariant())
-            {
-                case "carry":
-                case "carrying":
-                case "move_loaded":
-                case "loaded":
-                case "unload":
-                case "drop": return true;
-                default: return false;
-            }
+            var top = GameObject.CreatePrimitive(PrimitiveType.Cube);
+            top.name = "CargoTop";
+            Destroy(top.GetComponent<Collider>());
+            top.transform.SetParent(box.transform, false);
+            top.transform.localPosition = new Vector3(0f, 0.5f + 0.03f, 0f);   // 윗면 바로 위 (겹침 깜빡임 방지)
+            top.transform.localScale = new Vector3(1f, 0.06f, 1f);
+            return top.GetComponent<Renderer>();
         }
 
         RobotVisual GetOrCreateRobot(string id)
@@ -228,6 +227,7 @@ namespace RobotWarehouse.Playback
                 box.GetComponent<Renderer>().sharedMaterial = MaterialLibrary.BlockColored(InventoryView.BoxColor);
                 box.SetActive(false);
                 v.cargo = box;
+                v.cargoTop = AddCargoTop(box);
                 v.root = root;
                 v.baseHeight = 0f;
             }
@@ -248,6 +248,7 @@ namespace RobotWarehouse.Playback
                 box.GetComponent<Renderer>().sharedMaterial = MaterialLibrary.BlockColored(InventoryView.BoxColor);
                 box.SetActive(false);
                 v.cargo = box;
+                v.cargoTop = AddCargoTop(box);
                 v.cargoFollows = true;
             }
             _robots[id] = v;
@@ -301,8 +302,9 @@ namespace RobotWarehouse.Playback
                     if (v.status.sharedMaterial != mat) v.status.sharedMaterial = mat;
                     if (v.cargo != null)
                     {
-                        bool loaded = IsLoaded(state);
+                        bool loaded = Timeline.IsCarrying(id, Timeline.CurrentStep);   // 멈춰 기다릴 때도 유지
                         if (v.cargo.activeSelf != loaded) v.cargo.SetActive(loaded);
+                        if (loaded && v.cargoTop != null && v.cargoTop.sharedMaterial != mat) v.cargoTop.sharedMaterial = mat;
                         if (loaded && v.cargoFollows)
                         {
                             float bs = cs * InventoryView.BoxFootprint;

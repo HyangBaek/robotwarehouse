@@ -50,6 +50,9 @@ namespace RobotWarehouse.UI
         Text _stepBadgeText, _title;
         readonly Image[] _progress = new Image[4];
         readonly Text[] _progressText = new Text[4];
+        int _curStep = 1;                             // 지금 화면의 진행 단계 (완료 표시를 다시 그릴 때)
+        int _reachedStep = 1;                         // 이번 흐름에서 도달한 가장 높은 단계 (그 앞 단계는 완료)
+        readonly bool[] _stepDone = new bool[5];      // 단계별 완료 표시 (4 결과 분석: 병목 분석 결과를 받으면)
         readonly Image[] _progressLine = new Image[3];
         Image _connDot;
         Text _connText;
@@ -61,6 +64,7 @@ namespace RobotWarehouse.UI
         // S01 창고 만들기
         public Button SpeakButton, ManualButton, HistoryButton;
         public Button AdminButton;   // 머리글 오른쪽 '≡' (관리자 모드 진입, 평소 숨김)
+        public Button ViewModeButton;   // 머리글 '1:1 보기 / 축소 보기' (창고가 있을 때만)
         public Text CreateStatus, RequiredInfo;
 
         /// <summary>디지털 트윈에 필요한 지도 정보 (서버 tools/map_generator.REQUIRED_ITEMS 와 같은 순서). 빠지면 Agent 가 되묻는다.</summary>
@@ -133,7 +137,7 @@ namespace RobotWarehouse.UI
         readonly Text[,] _cmpCells = new Text[4, 4];
         readonly GameObject[] _cmpRows = new GameObject[4];
         public GameObject CmpHeatRow;
-        public Button CmpBeforeHeat, CmpAfterHeat, CmpPlayback, CmpRerun;
+        public Button CmpBeforeHeat, CmpAfterHeat, CmpPlayback, CmpRerun, CmpReport;
 
         // Feedback (토스트)
         RectTransform _toast;
@@ -216,16 +220,30 @@ namespace RobotWarehouse.UI
                 }
             }
 
-            UIFactory.Spacer(row, 24, 0);
+            // 보기 전환 (축소 모형 <-> 실물 1:1). 창고가 생긴 뒤에만 보이고, 어느 화면에서든 누를 수 있다
+            UIFactory.Spacer(row, 12, 0);
+            ViewModeButton = UIFactory.Button(row, "1:1 보기", null, UIFactory.Secondary, 136, 56, UIFactory.FontSmall);
+            ViewModeButton.gameObject.SetActive(false);
+
+            UIFactory.Spacer(row, 18, 0);
             (_connDot, _) = UIFactory.Badge(row, 24, "", UIFactory.Secondary);
             _connText = UIFactory.Label(row, "", UIFactory.FontSmall + 2, UIFactory.TextMain);
             _connText.fontStyle = FontStyle.Bold;
             _connText.horizontalOverflow = HorizontalWrapMode.Overflow;
-            UIFactory.SetWidth(_connText, 190);
+            UIFactory.SetWidth(_connText, 160);   // "저장된 결과"까지 들어가는 폭 (보기 전환 버튼 자리 확보)
 
             // 관리자 메뉴 버튼: 평소에는 숨김. 컨트롤러 비밀 입력(왼손 그립 + Y 3번)을 하면 잠깐 나타난다
             AdminButton = UIFactory.Button(row, "≡", null, new Color(1f, 1f, 1f, 0.14f), 60, 60, UIFactory.FontTitle);
             AdminButton.gameObject.SetActive(false);
+        }
+
+        /// <summary>머리글 보기 전환 버튼. miniature = 지금 축소 보기인지 (버튼에는 바꿀 보기를 적는다).</summary>
+        public void SetViewMode(bool available, bool miniature)
+        {
+            if (ViewModeButton == null) return;
+            if (ViewModeButton.gameObject.activeSelf != available) ViewModeButton.gameObject.SetActive(available);
+            UIFactory.SetButtonText(ViewModeButton, miniature ? "1:1 보기" : "축소 보기");
+            SetToggle(ViewModeButton, !miniature, UIFactory.Accent);
         }
 
         /// <summary>머리글의 관리자 메뉴 버튼 보이기 (비밀 입력 뒤 일정 시간).</summary>
@@ -368,7 +386,7 @@ namespace RobotWarehouse.UI
             RebuildButton = UIFactory.Button(f, "다시 만들기", null, UIFactory.Warning, 300);
             RackEditButton = UIFactory.Button(f, "랙 옮기기: 끔", null, UIFactory.Secondary, 270, UIFactory.ButtonHeight, UIFactory.FontSmall + 2);
             UIFactory.Spacer(f);
-            ConfirmButton = UIFactory.Button(f, "√  확인", null, UIFactory.Success, 340);
+            ConfirmButton = UIFactory.Button(f, "✓  확인", null, UIFactory.Success, 340);
         }
 
         void BuildQuestion()
@@ -562,7 +580,7 @@ namespace RobotWarehouse.UI
 
             ApprovalCancel = UIFactory.Button(f, "취소", null, UIFactory.Secondary, 300);
             UIFactory.Spacer(f);
-            ApprovalApply = UIFactory.Button(f, "√  적용", null, UIFactory.Success, 380);
+            ApprovalApply = UIFactory.Button(f, "✓  적용", null, UIFactory.Success, 380);
         }
 
         void BuildComparison()
@@ -589,9 +607,14 @@ namespace RobotWarehouse.UI
             CmpBeforeHeat = UIFactory.Button(heat, "적용 전", null, UIFactory.Secondary, 280, 84);
             CmpAfterHeat = UIFactory.Button(heat, "적용 후", null, UIFactory.Secondary, 280, 84);
 
-            CmpPlayback = UIFactory.Button(f, "재생 보기", null, UIFactory.Secondary, 300);
-            UIFactory.Spacer(f);
-            CmpRerun = UIFactory.Button(f, "다시 시뮬레이션", null, UIFactory.Primary, 420);
+            // 버튼 3개는 재생 화면 하단처럼 같은 폭으로 패널 폭을 나눠 쓴다 (고정 폭이면 패널 밖으로 넘침)
+            var hl = f.GetComponent<HorizontalLayoutGroup>();
+            hl.spacing = 20;
+            hl.childForceExpandWidth = true;
+            CmpPlayback = UIFactory.Button(f, "재생 보기", null, UIFactory.Secondary);
+            CmpRerun = UIFactory.Button(f, "다시 시뮬레이션", null, UIFactory.Secondary);
+            // 개선(또는 전략 비교) 결과의 최종 리포트: 지금 결과의 KPI, 로봇·주문 통계, 기준 전략 비교
+            CmpReport = UIFactory.Button(f, "리포트", null, UIFactory.Primary);
         }
 
         void BuildToast()
@@ -638,6 +661,10 @@ namespace RobotWarehouse.UI
         public void Show(UserScreen screen, int step, string title, Color? titleColor = null)
         {
             foreach (var kv in _screens) kv.Value.SetActive(kv.Key == screen);
+            _curStep = step;
+            // 창고를 다시 만들거나 확인하는 단계(1, 2)로 돌아가면 이후 진행은 새로 시작. 3, 4 사이 이동은 진행 유지
+            if (step <= 2) _reachedStep = step;
+            else _reachedStep = Mathf.Max(_reachedStep, step);
             _title.text = title;
             _title.color = titleColor ?? UIFactory.TextMain;
             SetStep(step);
@@ -675,6 +702,14 @@ namespace RobotWarehouse.UI
 
         public void Refit() => FitHeight(Current);
 
+        /// <summary>단계 완료 표시를 켜고 끈다 (예: 병목 분석 결과를 받으면 4단계 완료).</summary>
+        public void SetStepDone(int step, bool done)
+        {
+            if (step < 1 || step > 4 || _stepDone[step] == done) return;
+            _stepDone[step] = done;
+            SetStep(_curStep);
+        }
+
         void SetStep(int step)
         {
             step = Mathf.Clamp(step, 1, 4);
@@ -682,10 +717,12 @@ namespace RobotWarehouse.UI
             _stepBadge.color = UIFactory.Primary;
             for (int i = 0; i < 4; i++)
             {
-                bool done = i + 1 < step, now = i + 1 == step;
+                // 완료: 지금보다 앞 단계, 이미 지나온 단계(분석 후 재생 화면으로 돌아와도 유지), 완료 표시한 단계
+                bool done = i + 1 < Mathf.Max(step, _reachedStep) || _stepDone[i + 1];
+                bool now = i + 1 == step && !done;
                 _progress[i].sprite = done || now ? UIFactory.CircleSprite : UIFactory.RingSprite;
                 _progress[i].color = done ? UIFactory.Success : now ? UIFactory.Primary : UIFactory.TextMuted;
-                _progressText[i].text = done ? "√" : (i + 1).ToString();
+                _progressText[i].text = done ? "✓" : (i + 1).ToString();
                 _progressText[i].color = done || now ? Color.white : UIFactory.TextMuted;
                 if (i < 3) _progressLine[i].color = done ? UIFactory.Success : UIFactory.DividerColor;
             }
@@ -742,7 +779,7 @@ namespace RobotWarehouse.UI
                 {
                     case ProcState.Done:
                         badge.sprite = UIFactory.CircleSprite; badge.color = UIFactory.Success;
-                        mark.text = "√"; label.color = UIFactory.TextMain; break;
+                        mark.text = "✓"; label.color = UIFactory.TextMain; break;
                     case ProcState.Active:
                         badge.sprite = UIFactory.RingSprite; badge.color = UIFactory.Primary;
                         mark.text = "●"; mark.color = UIFactory.Primary; label.color = UIFactory.Lighten(UIFactory.Primary, 0.35f); break;

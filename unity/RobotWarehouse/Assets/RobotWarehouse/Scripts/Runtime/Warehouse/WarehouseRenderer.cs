@@ -37,7 +37,7 @@ namespace RobotWarehouse.Warehouse
         public float TallestHeight { get; private set; }
         public bool WallsTranslucent { get; private set; }
         readonly List<Renderer> _wallRenderers = new List<Renderer>();
-        Material _wallGlass;
+        Material _wallGlass, _wallTinted;
         public IReadOnlyDictionary<Vector2Int, GameObject> RackObjects => _rackObjects;
 
         /// <summary>히트맵 레이어가 쓰는 바닥 위 투명 평면.</summary>
@@ -314,15 +314,37 @@ namespace RobotWarehouse.Warehouse
         /// <summary>실물 보기에서 둘레 벽이 시야를 가리지 않도록 반투명 유리처럼 바꾼다.</summary>
         public void SetWallsTranslucent(bool on)
         {
-            WallsTranslucent = on;
             if (on && _wallGlass == null)
             {
                 _wallGlass = new Material(MaterialLibrary.Overlay) { name = "WallGlass" };
                 MaterialLibrary.SetMaterialColor(_wallGlass, new Color(0.65f, 0.8f, 1f, 0.18f));
             }
+            ApplyWallMaterial(on, _wallGlass);
+        }
+
+        /// <summary>벽을 지정한 색, 불투명도로 반투명하게 (축소 보기: 벽 색 그대로 두고 벽 뒤 로봇이 비쳐 보이게).</summary>
+        public void SetWallsTranslucent(bool on, Color tint, float alpha)
+        {
+            if (on)
+            {
+                if (_wallTinted == null) _wallTinted = new Material(MaterialLibrary.Overlay) { name = "WallTinted" };
+                tint.a = Mathf.Clamp01(alpha);
+                MaterialLibrary.SetMaterialColor(_wallTinted, tint);
+            }
+            ApplyWallMaterial(on, _wallTinted);
+        }
+
+        void ApplyWallMaterial(bool on, Material translucent)
+        {
+            WallsTranslucent = on;
             var solid = MaterialLibrary.BlockColored(WallColor);
             foreach (var r in _wallRenderers)
-                if (r != null) r.sharedMaterial = on ? _wallGlass : solid;
+            {
+                if (r == null) continue;
+                r.sharedMaterial = on ? translucent : solid;
+                // 반투명 벽은 그림자를 만들지 않는다 (벽 뒤가 어둡게 가려지지 않게)
+                r.shadowCastingMode = on ? UnityEngine.Rendering.ShadowCastingMode.Off : UnityEngine.Rendering.ShadowCastingMode.On;
+            }
         }
 
         // ---------- 3D 에셋 랙 (Unity Warehouse -> URP 변환 프리팹) ----------

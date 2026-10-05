@@ -58,7 +58,8 @@ def validate_map(m: dict[str, Any]) -> dict[str, Any]:
         for n in neighbors(x, y):
             if n not in seen and g.get(n) in PASSABLE:
                 seen.add(n)
-                q.append(n)
+                if g.get(n) != "charge":   # 충전 칸은 들어갈 수만 있고 지나가는 길이 아니다
+                    q.append(n)
     unreachable = []
     for p, t in g.items():
         if t == "rack" and not any(n in seen for n in neighbors(*p)):

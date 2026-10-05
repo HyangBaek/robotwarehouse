@@ -89,7 +89,8 @@ def _bfs(g, starts):
         for n in neighbors(x, y):
             if n not in seen and g.get(n) in PASSABLE:
                 seen.add(n)
-                q.append(n)
+                if g.get(n) != "charge":   # 충전 칸은 들어갈 수만 있고 지나가는 길이 아니다 (planner.engine.NO_TRANSIT)
+                    q.append(n)
     return seen
 
 
@@ -108,7 +109,8 @@ def _one_way_unreachable(m: dict, g: dict) -> list[list[int]]:
             for j in adj[i]:
                 if j not in seen:
                     seen.add(j)
-                    q.append(j)
+                    if not G.no_transit[j]:    # 충전 칸을 거쳐 가는 길은 세지 않는다
+                        q.append(j)
         return seen
 
     core = reach(docks[0], G.adj) & reach(docks[0], G.radj)   # 첫 도크가 속한 강연결 영역
