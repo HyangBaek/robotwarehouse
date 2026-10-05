@@ -531,6 +531,8 @@ namespace RobotWarehouse.Warehouse
 
         /// <summary>병목 마커 보이기 (관리자 패널 Debug Overlay)</summary>
         public bool MarkersVisible { get; private set; } = true;
+        /// <summary>병목 마커가 하나라도 있는지 (분석 전·새 시뮬레이션 뒤에는 없음)</summary>
+        public bool HasMarkers => _markersRoot != null && _markersRoot.childCount > 0;
 
         public void SetMarkersVisible(bool v)
         {

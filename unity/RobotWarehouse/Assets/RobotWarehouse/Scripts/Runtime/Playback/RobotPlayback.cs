@@ -115,14 +115,64 @@ namespace RobotWarehouse.Playback
             _root.gameObject.AddComponent<KeepOnRebuild>();
             _root.SetParent(warehouse.transform, false);
 
-            var marker = GameObject.CreatePrimitive(PrimitiveType.Cylinder);
-            marker.name = "SelectedMarker";
-            Destroy(marker.GetComponent<Collider>());
+            // 선택 표시: 끝이 로봇을 가리키는 거꾸로 된 물방울(지도 핀) 모양
+            var marker = new GameObject("SelectedMarker");
             marker.transform.SetParent(_root, false);
-            marker.transform.localScale = new Vector3(0.15f, 0.6f, 0.15f);
-            marker.GetComponent<Renderer>().sharedMaterial = MaterialLibrary.BlockColored(Color.white);
+            marker.AddComponent<MeshFilter>().sharedMesh = BuildPinMesh(0.13f, 0.32f, 24, 10);
+            marker.AddComponent<MeshRenderer>().sharedMaterial = MaterialLibrary.BlockColored(Color.white);
             _selectMarker = marker.transform;
             _selectMarker.gameObject.SetActive(false);
+        }
+
+        /// <summary>
+        /// 거꾸로 된 물방울(핀) 메시. 원점이 아래쪽 뾰족한 끝이고 위로 갈수록 구가 된다.
+        /// radius: 머리 구 반지름, centerY: 끝에서 구 중심까지 높이 (radius보다 커야 함).
+        /// 원뿔 옆면이 구에 접하도록 이어서 이음매 없이 매끈하게 보인다.
+        /// </summary>
+        static Mesh BuildPinMesh(float radius, float centerY, int segments, int arcSteps)
+        {
+            float sinA = radius / centerY, cosA = Mathf.Sqrt(1f - sinA * sinA);
+            float thetaT = Mathf.Acos(-sinA);           // 접점 위치 (구 위쪽 축 기준 각도)
+
+            // 단면 윤곽 (r, y)와 법선 (nr, ny): 끝 → 접점 → 구 꼭대기
+            var prof = new List<Vector4>();
+            var cone = new Vector2(cosA, -sinA);
+            prof.Add(new Vector4(0f, 0f, cone.x, cone.y));
+            for (int i = 0; i <= arcSteps; i++)
+            {
+                float th = Mathf.Lerp(thetaT, 0f, i / (float)arcSteps);
+                float s = Mathf.Sin(th), c = Mathf.Cos(th);
+                prof.Add(new Vector4(radius * s, centerY + radius * c, s, c));
+            }
+
+            int rows = prof.Count, cols = segments + 1;
+            var verts = new Vector3[rows * cols];
+            var norms = new Vector3[rows * cols];
+            for (int r = 0; r < rows; r++)
+                for (int k = 0; k < cols; k++)
+                {
+                    float a = k / (float)segments * Mathf.PI * 2f;
+                    float ca = Mathf.Cos(a), sa = Mathf.Sin(a);
+                    var p = prof[r];
+                    verts[r * cols + k] = new Vector3(p.x * ca, p.y, p.x * sa);
+                    norms[r * cols + k] = new Vector3(p.z * ca, p.w, p.z * sa).normalized;
+                }
+
+            var tris = new List<int>((rows - 1) * segments * 6);
+            for (int r = 0; r < rows - 1; r++)
+                for (int k = 0; k < segments; k++)
+                {
+                    int a = r * cols + k, b = a + 1, c = a + cols, d = c + 1;
+                    tris.Add(a); tris.Add(c); tris.Add(b);
+                    tris.Add(b); tris.Add(c); tris.Add(d);
+                }
+
+            var mesh = new Mesh { name = "SelectPin" };
+            mesh.vertices = verts;
+            mesh.normals = norms;
+            mesh.SetTriangles(tris, 0);
+            mesh.RecalculateBounds();
+            return mesh;
         }
 
         static bool IsLoaded(string state)
@@ -274,7 +324,12 @@ namespace RobotWarehouse.Playback
                 bool show = SelectedRobot != null && _robots.TryGetValue(SelectedRobot, out sel)
                             && sel.root != null && sel.root.gameObject.activeSelf;
                 _selectMarker.gameObject.SetActive(show);
-                if (show) _selectMarker.localPosition = sel.root.localPosition + Vector3.up * 1.2f;
+                if (show)
+                {
+                    // 끝이 로봇 위 1m에 오도록 두고 위아래로 살짝 흔들어 눈에 띄게 한다
+                    float bob = Mathf.Sin(Time.time * 3f) * 0.05f;
+                    _selectMarker.localPosition = sel.root.localPosition + Vector3.up * (1.0f + bob);
+                }
             }
         }
 

@@ -95,6 +95,7 @@ namespace RobotWarehouse.App
         string _questionText;
         int _questionRounds;
         bool _offline;
+        int _markerCount = -1;   // 병목 기둥 수. -1이면 이번 시뮬레이션에서 아직 병목 분석 전
         bool _miniature = true;
         bool _updatingSlider;
         int _fetchGeneration;
@@ -250,6 +251,7 @@ namespace RobotWarehouse.App
             _dev = _ui.Dev;
             // 화면이 바뀌면 예약된 화면 전환, 응답 대기 시간 초과를 무효로
             _user.OnScreenChanged += _ => _screenToken++;
+            _user.OnScreenChanged += sc => { if (sc == UserScreen.Analysis || sc == UserScreen.Heatmap) RefreshMarkerButtons(); };
             BuildAdmin();
             PlacePanels();
             _report = new ReportPanel();
@@ -305,7 +307,15 @@ namespace RobotWarehouse.App
             _user.ReportButton.onClick.AddListener(OpenReport);
 
             // 경로, 히트맵
-            _user.PathOffButton.onClick.AddListener(() => { _pathView.SetVisible(false); _user.HighlightRobot(null, false); });
+            _user.PathOffButton.onClick.AddListener(() =>
+            {
+                _pathView.SetVisible(false);
+                _playback.SelectRobot(null);   // 로봇 머리 위 흰 선택 표시도 끈다
+                _user.HighlightRobot(null, false);
+            });
+            // 병목 기둥(분석 결과 3D 마커) 켜고 끄기: 분석 화면, 히트맵 화면
+            _user.AnalysisMarkersButton.onClick.AddListener(ToggleMarkers);
+            _user.HeatmapMarkersButton.onClick.AddListener(ToggleMarkers);
             _user.PathCloseButton.onClick.AddListener(GoPlayback);
             _user.MetricWaitButton.onClick.AddListener(() => SetMetric(HeatmapMetric.Wait));
             _user.MetricPassButton.onClick.AddListener(() => SetMetric(HeatmapMetric.Pass));
@@ -453,6 +463,40 @@ namespace RobotWarehouse.App
             if (_user.Current == UserScreen.Comparison) RestoreAfterStats();
             _user.Show(UserScreen.SimConfig, 3, "시뮬레이션 설정");
             RefreshInteractable();
+        }
+
+        void ToggleMarkers()
+        {
+            if (_markerCount < 0)
+            {
+                // 분석 전: 버튼은 눌리게 두고 무엇을 먼저 해야 하는지 알려 준다
+                if (_user.AnalyzeButton.interactable)
+                    _user.Toast("병목 기둥은 병목 분석 뒤에 볼 수 있어요", ToastKind.Warning, 5f, "병목 분석", RequestAnalysis);
+                else
+                    _user.Toast("병목 기둥은 병목 분석 뒤에 볼 수 있어요. 재생 화면에서 병목 분석을 눌러 주세요", ToastKind.Warning, 5f);
+                return;
+            }
+            if (_markerCount == 0)
+            {
+                _user.Toast("분석 결과 큰 병목이 없어 표시할 기둥이 없어요", ToastKind.Info);
+                return;
+            }
+            _warehouse.SetMarkersVisible(!_warehouse.MarkersVisible);
+            RefreshMarkerButtons();
+        }
+
+        void RefreshMarkerButtons()
+        {
+            bool on = _markerCount > 0 && _warehouse.MarkersVisible;
+            string label = _markerCount < 0 ? "병목 기둥: 분석 전"
+                         : _markerCount == 0 ? "병목 기둥: 없음"
+                         : on ? "병목 기둥: 켬" : "병목 기둥: 끔";
+            foreach (var b in new[] { _user.AnalysisMarkersButton, _user.HeatmapMarkersButton })
+            {
+                UIFactory.SetButtonText(b, label);
+                _user.SetToggle(b, on, UIFactory.Danger);
+                UIFactory.SetInteractable(b, true);   // 비활성 대신 눌렀을 때 안내
+            }
         }
 
         void GoPlayback()
@@ -1239,6 +1283,7 @@ namespace RobotWarehouse.App
             _playback.Begin(total);
             _framesComplete = false;
             _warehouse.ClearMarkers();
+            _markerCount = -1;
             _proposals.Clear();
             _simSummary = SummaryLine(msg.Get("summary"));
             Log(LogLevel.Info, LogModule.Sim, $"sim_ready ({strategy}) 총 {total} 스텝. {SimParsers.Describe(msg.Get("summary"))}", null, null, msg.Raw);
@@ -1553,6 +1598,8 @@ namespace RobotWarehouse.App
         {
             var bottlenecks = msg.Get("bottlenecks")?.ToObject<List<Bottleneck>>() ?? new List<Bottleneck>();
             _warehouse.SetBottleneckMarkers(bottlenecks);
+            _warehouse.SetMarkersVisible(true);   // 새 분석 결과는 보이게 시작
+            _markerCount = bottlenecks.Count;
             Log(LogLevel.Info, LogModule.Agent, "병목: " + string.Join(", ", bottlenecks.Take(5).Select(b => $"({b.x},{b.y}) 대기 {b.wait}")),
                 "BOTTLENECK", bottlenecks.Count > 0 ? new Vector2Int(bottlenecks[0].x, bottlenecks[0].y) : (Vector2Int?)null, msg.Raw);
             _agent.Finish(RunState.Completed, $"analysis 병목 {bottlenecks.Count}곳", msg.Raw);
@@ -1634,6 +1681,7 @@ namespace RobotWarehouse.App
             _heatmap.SetVisible(false);
             _pathView.SetVisible(false);
             _warehouse.ClearMarkers();
+            _markerCount = -1;
             _user.ClearProposals();
         }
 

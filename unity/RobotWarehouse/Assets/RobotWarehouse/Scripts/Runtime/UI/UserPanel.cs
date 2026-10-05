@@ -116,12 +116,12 @@ namespace RobotWarehouse.UI
         public readonly List<Button> RobotButtons = new List<Button>();
 
         // 히트맵 보기
-        public Button MetricWaitButton, MetricPassButton, HeatmapOffButton, HeatmapCloseButton;
+        public Button MetricWaitButton, MetricPassButton, HeatmapOffButton, HeatmapCloseButton, HeatmapMarkersButton;
 
         // S06 병목 분석
         public Text BottleneckTitle, BottleneckWhere, BottleneckDetail, AgentExplain, ProposalHint;
         public RectTransform ProposalList;
-        public Button AnalysisClose;
+        public Button AnalysisClose, AnalysisMarkersButton;
         public readonly List<Button> ProposalButtons = new List<Button>();
 
         // S07 개선안 승인
@@ -490,6 +490,7 @@ namespace RobotWarehouse.UI
             UIFactory.Spacer(m);
 
             HeatmapOffButton = UIFactory.Button(f, "히트맵 끄기", null, UIFactory.Secondary, 300);
+            HeatmapMarkersButton = UIFactory.Button(f, "병목 기둥: 켬", null, UIFactory.Secondary, 300);
             UIFactory.Spacer(f);
             HeatmapCloseButton = UIFactory.Button(f, "닫기", null, UIFactory.Primary, 300);
         }
@@ -544,6 +545,7 @@ namespace RobotWarehouse.UI
             ProposalList = list;
             ProposalHint = UIFactory.Label(right, "고르면 적용 전에 한 번 더 확인해요", UIFactory.FontSmall, UIFactory.TextDim);
 
+            AnalysisMarkersButton = UIFactory.Button(f, "병목 기둥: 켬", null, UIFactory.Secondary, 300);
             UIFactory.Spacer(f);
             AnalysisClose = UIFactory.Button(f, "닫기", null, UIFactory.Primary, 320);
         }
