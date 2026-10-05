@@ -27,6 +27,7 @@ from fastapi.responses import JSONResponse
 from mock.engine import simulate
 from mock.mapgen import generate_map, summarize
 from mock.parse_text import extract_requirements, fill_defaults, merge_answer
+from mock.report import build_report
 from mock.validator import validate_map, question_for, options_for
 
 log = logging.getLogger("mock")
@@ -370,6 +371,36 @@ async def compare(body: dict[str, Any]):
 
     asyncio.create_task(run())
     return {"request_id": new_id("REQ")}
+
+
+@app.post("/report")
+async def report(body: dict[str, Any]):
+    """최종 리포트 (FR-25 집계 + FR-28 기준 전략 비교) → WS report. 실제 서버(api/routes_analysis.py)와 같은 형식."""
+    e = get_sim(body.get("sim_id"))
+    s = session(e.session_id)
+
+    async def run():
+        try:
+            await status(s, "최종 리포트", "로봇 효율·주문 처리 시간·기준 전략 비교 집계")
+            rep = await asyncio.to_thread(report_for, e)
+            await emit(s, {"type": "report", **rep, "html_url": None})
+        except Exception as ex:   # noqa: BLE001
+            log.exception("리포트 실패")
+            await emit(s, {"type": "error", "code": "REPORT_ERROR", "message": f"리포트 생성 실패: {ex}"})
+
+    asyncio.create_task(run())
+    return {"request_id": new_id("REQ")}
+
+
+def report_for(e: SimEntry) -> dict[str, Any]:
+    m = MAPS[e.map_version].map
+    base = simulate(m, e.scenario, "baseline", 42, e.events)
+    return build_report(e.log, m, e.scenario, base, summarize(m), e.sim_id)
+
+
+@app.get("/sim/{sim_id}/report")
+async def report_json(sim_id: str):
+    return await asyncio.to_thread(report_for, get_sim(sim_id))
 
 
 # ------------------------------------------------------------------ 분석, 개선 (SC-09, 10)

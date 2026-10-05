@@ -254,6 +254,8 @@ namespace RobotWarehouse.App
             PlacePanels();
             _report = new ReportPanel();
             _report.Build(null);
+            // 리포트는 사용자 패널 자리에 대신 열린다 → 닫으면 사용자 패널을 다시 보인다 (창 겹침 방지)
+            _report.OnClosed += () => { if (!_adminMode) _user.Canvas.gameObject.SetActive(true); };
             _history = new HistoryPanel();
             _history.Build(null);
             _history.OnLoad += LoadHistory;
@@ -994,7 +996,6 @@ namespace RobotWarehouse.App
                 case ServerMessage.Analysis: OnAnalysis(msg); break;
                 case ServerMessage.Error: OnServerError(msg); break;
                 case ServerMessage.Status: OnStatus(msg); break;
-                case ServerMessage.Tts: break;
                 case ServerMessage.Scenario: OnScenario(msg); break;
                 case ServerMessage.Report: OnReport(msg); break;
                 default: Log(LogLevel.Warn, LogModule.Ws, $"알 수 없는 type: {msg.Type}", "UNKNOWN_TYPE", null, msg.Raw); break;
@@ -1007,6 +1008,7 @@ namespace RobotWarehouse.App
             var text = msg.GetString("message");
             Log(LogLevel.Error, ModuleOfCode(code), text, code, ErrorCell(msg), msg.Raw);
             _agent.Finish(RunState.Error, $"{code} {text}", msg.Raw);
+            if (code == "REPORT_ERROR") _showReportWhenReady = false;   // 오류 알림은 아래 기본 처리(토스트)
             switch (code)
             {
                 case "STT_EMPTY":
@@ -1289,8 +1291,27 @@ namespace RobotWarehouse.App
             if (_reportSimId == simId) { _lastReport = null; _reportShownFor = null; }
             StartCoroutine(_api.PostJson(ApiRoutes.Report, new { session_id = AppConfig.SessionId, sim_id = simId }, r =>
             {
-                if (!r.Ok) Debug.LogWarning($"[Report] 요청 실패: {r.ErrorMessage}");
+                if (r.Ok) return;
+                Log(LogLevel.Warn, LogModule.Api, $"POST /report 실패: {r.ErrorMessage}", r.TimedOut ? "TIMEOUT" : $"HTTP_{r.Status}", null, r.Text);
+                // 사용자가 리포트를 기다리는 중이면 알린다 (예: /report 가 없는 예전 모의 서버 → 404)
+                if (_showReportWhenReady && simId == _simId)
+                {
+                    _showReportWhenReady = false;
+                    _user.Toast($"리포트를 만들지 못했어요 ({r.ErrorMessage})", ToastKind.Error, 6f, "다시 시도", OpenReport);
+                }
             }));
+        }
+
+        int _reportWaitToken;
+
+        /// <summary>리포트를 기다리는데 일정 시간 안에 WS report 가 오지 않으면 알리고 대기를 푼다.</summary>
+        System.Collections.IEnumerator ReportTimeout(int token, float seconds)
+        {
+            yield return new WaitForSeconds(seconds);
+            if (token != _reportWaitToken || !_showReportWhenReady) yield break;
+            _showReportWhenReady = false;
+            Log(LogLevel.Warn, LogModule.Api, $"리포트 응답 없음 ({seconds:0}초)", "REPORT_TIMEOUT");
+            _user.Toast("리포트 응답이 없어요. 서버 연결과 로그를 확인해 주세요", ToastKind.Warning, 6f, "다시 시도", OpenReport);
         }
 
         void OnReport(ServerMessage msg)
@@ -1315,6 +1336,7 @@ namespace RobotWarehouse.App
             if (_lastReport != null && _reportSimId == _simId) { ShowReport(); return; }
             _showReportWhenReady = true;
             _user.Toast("최종 리포트를 만들고 있어요 (기준 전략 비교 포함)", ToastKind.Info);
+            StartCoroutine(ReportTimeout(++_reportWaitToken, 40f));
             RequestReport(_simId);
         }
 
@@ -1341,8 +1363,20 @@ namespace RobotWarehouse.App
             if (_lastReport == null) return;
             if (_history.Visible) _history.Hide();
             _report.Show(_lastReport, AppConfig.HttpBase);
-            PlaceInFront(_report.Canvas);
+            PlaceAtUserPanel(_report.Canvas);
+            _user.Canvas.gameObject.SetActive(false);
             _reportShownFor = _reportSimId;
+        }
+
+        /// <summary>사용자 패널과 같은 자리·방향 (둘 다 아래 가장자리 기준)에 놓는다.</summary>
+        void PlaceAtUserPanel(Canvas canvas)
+        {
+            var u = _user.Canvas.transform;
+            var t = canvas.transform;
+            t.SetParent(u.parent, false);
+            t.position = u.position;
+            t.rotation = u.rotation;
+            XRSupport.RefreshRaycasters(canvas);
         }
 
         // ------------------------------------------------------------------ 시뮬레이션 기록 (SQLite)
@@ -1483,9 +1517,13 @@ namespace RobotWarehouse.App
         {
             var baseline = msg.Get("baseline") as JObject;
             var optimized = msg.Get("optimized") as JObject;
-            float pct = msg.GetFloat("improvement_pct");
-            Log(LogLevel.Info, LogModule.Sim, $"비교 결과: 개선율 {pct:0.0}%", null, null, msg.Raw);
-            _agent.Finish(RunState.Completed, $"compare {pct:0.0}%", msg.Raw);
+            // 한쪽이라도 주문을 다 처리하지 못하면 서버가 improvement_pct 를 null 로, 이유를 note 로 보낸다 (착시 방지)
+            var pctToken = msg.Get("improvement_pct");
+            bool hasPct = pctToken != null && pctToken.Type != JTokenType.Null;
+            float pct = hasPct ? msg.GetFloat("improvement_pct") : 0f;
+            string note = msg.GetString("note");
+            Log(LogLevel.Info, LogModule.Sim, hasPct ? $"비교 결과: 개선율 {pct:0.0}%" : $"비교 결과: {note}", null, null, msg.Raw);
+            _agent.Finish(RunState.Completed, hasPct ? $"compare {pct:0.0}%" : "compare n/a", msg.Raw);
             _lastCompare = msg.Root;
             var rows = new List<(string, string, string, string, bool)>();
             if (baseline != null && optimized != null)
@@ -1502,7 +1540,9 @@ namespace RobotWarehouse.App
                         rows.Add((prop.Name, prop.Value.ToString(), other.ToString(), "", true));
                 }
             }
-            _user.SetComparison("기준 전략", "최적화", rows, $"같은 창고·주문에서 기준 전략 대비 처리 스텝 {pct:0.#}% 개선");
+            _user.SetComparison("기준 전략", "최적화", rows,
+                hasPct ? $"같은 창고·주문에서 기준 전략 대비 처리 스텝 {pct:0.#}% 개선"
+                       : (string.IsNullOrEmpty(note) ? "주문을 다 처리하지 못해 개선율을 비교할 수 없어요" : note));
             _user.CmpHeatRow.SetActive(false);
             _statsBefore = null;
             _statsAfter = null;

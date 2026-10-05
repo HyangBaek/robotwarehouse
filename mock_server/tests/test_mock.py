@@ -246,3 +246,19 @@ def test_question_has_options(client):
         client.post("/map/text", json={"session_id": "s6", "text": "랙 10줄을 통로 없이 붙여서 배치해줘"})
         q = recv_until(ws, "question")
         assert q["options"] and all("label" in o and "text" in o for o in q["options"])
+
+
+def test_api_report(client):  # FR-25, FR-28: 리포트 (실제 서버와 같은 필드)
+    with client.websocket_connect("/ws/s7") as ws:
+        client.post("/map/text", json={"session_id": "s7", "text": "랙 4줄, 통로 폭 3m, 입하 도크 1개, 출하 도크 1개"})
+        m = recv_until(ws, "map_ready")
+        client.post("/map/confirm", json={"session_id": "s7", "map_version": m["map_version"]})
+        client.post("/scenario", json={"session_id": "s7", "map_version": m["map_version"], "robots": 3, "inbound": 6, "outbound": 6})
+        sim = recv_until(ws, "sim_ready")
+        client.post("/report", json={"session_id": "s7", "sim_id": sim["sim_id"]})
+        rep = recv_until(ws, "report")
+    assert rep["sim_id"] == sim["sim_id"]
+    for key in ("kpis", "robots", "orders", "timeline", "comparison", "insights", "baseline", "scenario"):
+        assert key in rep
+    assert rep["kpis"]["orders_done"] == rep["orders"]["done"] == 12
+    assert len(rep["robots"]) == 3 and rep["comparison"][0]["key"] == "total_steps"
