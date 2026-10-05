@@ -444,7 +444,16 @@ namespace RobotWarehouse.App
         void SubmitManual()
         {
             var text = _user.ManualInput.text?.Trim();
-            if (string.IsNullOrEmpty(text)) { _user.Toast("내용을 입력해 주세요", ToastKind.Warning); return; }
+            if (string.IsNullOrEmpty(text))
+            {
+                // 아무것도 적지 않고 누르면 막지 않고 기본 항목으로 진행 (음성 인식 실패 때와 같은 기본값)
+                bool answer = _voiceTarget == VoiceTarget.Answer;
+                text = answer ? DefaultAnswerText : DefaultWarehouseText;
+                _user.Toast(answer ? "입력이 없어 나머지는 기본값으로 답할게요"
+                                   : "입력이 없어 기본 항목으로 창고를 만들게요 (랙 6줄 3단, 통로 3m, 도크 입하·출하 1개씩)",
+                            ToastKind.Info, 5f);
+                Log(LogLevel.Info, LogModule.Agent, $"직접 입력 비어 있음 -> 기본값 사용: \"{text}\"");
+            }
             if (_voiceTarget == VoiceTarget.Answer) SendAnswer(text);
             else RequestMapFromText(text);
         }
@@ -1760,11 +1769,15 @@ namespace RobotWarehouse.App
             {
                 SetLifeSizeVisuals(false, Vector3.zero, 0f);
                 RealignToTable();
+                _user.Toast("축소 보기: 테이블 위 창고 모형으로 돌아왔어요", ToastKind.Info, 3f);
             }
             else
             {
                 ApplyViewMode();
                 PlacePanelsAroundViewer();
+                // 처음 보는 사람도 무엇이 바뀌었는지 알 수 있게 잠깐 안내 (두 줄)
+                _user.Toast("실물 1:1 보기: 무인 창고를 위에서 내려다보는 관제 시야예요\n발밑은 유리 바닥이라 안전하게 서서 볼 수 있어요",
+                            ToastKind.Info, 6f);
                 if (_warehouse.Map == null) Log(LogLevel.Info, LogModule.Vr, "실물 보기: 창고를 만들거나 오프라인 재생을 누르면 발밑 아래에 1:1로 펼쳐집니다");
             }
         }
